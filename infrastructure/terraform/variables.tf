@@ -40,9 +40,9 @@ variable "vm_name" {
 }
 
 variable "vm_size" {
-  description = "Size of the Azure VM. Standard_B2s provides 2 vCPUs and 4GB RAM."
+  description = "Size of the Azure VM. Standard_B1s (~$3.80/mo) is the cheapest available option in Central India."
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_B1s"
 }
 
 variable "admin_username" {

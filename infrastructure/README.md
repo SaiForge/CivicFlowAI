@@ -115,7 +115,7 @@ infrastructure/
    resource_group_name   = "rg-civicflow-prod"
    location              = "centralindia"
    deployment_mode       = "vm"
-   vm_size               = "Standard_B2s"
+   vm_size               = "Standard_B1s" # Cheapest available in Central India (~$3.80/mo) or Standard_B1ms (~$15/mo)
    admin_username        = "azureuser"
    ssh_public_key_path   = "~/.ssh/id_rsa.pub"
    dns_prefix            = "civicflow-ai-portal"
