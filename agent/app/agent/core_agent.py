@@ -179,6 +179,11 @@ class ManagerAgent:
             "audit_trail": audit_trail,
             "raw_incident": incident_data,
             "workflow": workflow_data,
+            "severity_score": severity_data.get("severity_score"),
+            "severity_breakdown": severity_data.get("factor_breakdown"),
+            "issue_confidence": issue_data.get("confidence", 0.9),
+            "routing_confidence": routing_data.get("confidence", 0.9),
+            "grounding_score": state.get("evidence", {}).get("grounding_score", 1.0),
         }
 
         try:

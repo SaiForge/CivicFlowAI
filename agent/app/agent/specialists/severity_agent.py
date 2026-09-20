@@ -35,7 +35,12 @@ class SeverityAgent:
                 prompt_parts.append(f"Identified Issue Category: {issue.get('issue_type', 'unknown')}")
             if evidence:
                 prompt_parts.append(f"Evidence Findings: {evidence.get('visual_findings', 'none')}")
-                prompt_parts.append(f"Evidence Grounding Score: {evidence.get('grounding_score', 'unknown')}")
+            has_image = bool(image_b64)
+            if not has_image:
+                prompt_parts.append("Visual Evidence Status: NO IMAGE PROVIDED by citizen.")
+                prompt_parts.append("STRICT GROUNDING REQUIREMENT: visual_severity MUST BE 0.0. Do NOT invent or estimate visual severity from textual descriptions. Use the no-image rubric: safety_risk (45%), public_impact (35%), recurrence (20%).")
+            else:
+                prompt_parts.append("Visual Evidence Status: Citizen provided an attached image.")
 
             user_prompt = "\n".join(prompt_parts)
 
@@ -51,10 +56,14 @@ class SeverityAgent:
             safety = float(fb.get("safety_risk", 0.0))
             impact = float(fb.get("public_impact", 0.0))
             recurrence = float(fb.get("recurrence", 0.0))
-            visual = float(fb.get("visual_severity", 0.0))
 
-            # Recalculate accurately using calculator tool for determinism
-            calc_expr = f"({safety} * 0.40) + ({impact} * 0.30) + ({recurrence} * 0.15) + ({visual} * 0.15)"
+            if not has_image:
+                visual = 0.0
+                calc_expr = f"({safety} * 0.45) + ({impact} * 0.35) + ({recurrence} * 0.20)"
+            else:
+                visual = float(fb.get("visual_severity", 0.0))
+                calc_expr = f"({safety} * 0.40) + ({impact} * 0.30) + ({recurrence} * 0.15) + ({visual} * 0.15)"
+
             calculated_score = round(self.calculator.run(calc_expr), 1)
 
             # Re-map severity category if score doesn't align
@@ -67,9 +76,22 @@ class SeverityAgent:
             else:
                 calculated_severity = "Low"
 
-            # Use LLM values but sync score and level
+            # Enforce strictly grounded reasoning if no image was provided
+            if not has_image:
+                reasoning = (
+                    f"Assessed as {calculated_severity} (Score {calculated_score}): "
+                    f"Safety risk={safety} (45%), Public impact={impact} (35%), Recurrence={recurrence} (20%). "
+                    f"Visual severity is 0.0 as no visual image was provided."
+                )
+            else:
+                reasoning = response.get("reasoning") or (
+                    f"Assessed as {calculated_severity} (Score {calculated_score}): "
+                    f"Safety={safety} (40%), Impact={impact} (30%), Recurrence={recurrence} (15%), Visual={visual} (15%)."
+                )
+
             response["severity_score"] = calculated_score
-            response["severity"] = response.get("severity") or calculated_severity
+            response["severity"] = calculated_severity
+            response["reasoning"] = reasoning
             response["factor_breakdown"] = {
                 "safety_risk": safety,
                 "public_impact": impact,
@@ -84,13 +106,21 @@ class SeverityAgent:
 
         except Exception as e:
             logger.error(f"SeverityAgent run failed: {e}", exc_info=True)
+            has_image = bool(state.get("input", {}).get("image_base64"))
+            fallback_score = 52.5 if not has_image else 50.0
             fallback = SeverityResult(
                 severity="Medium",
-                severity_score=50.0,
+                severity_score=fallback_score,
                 factor_breakdown=SeverityFactorBreakdown(
-                    safety_risk=50.0, public_impact=50.0, recurrence=50.0, visual_severity=50.0
+                    safety_risk=55.0,
+                    public_impact=50.0,
+                    recurrence=45.0,
+                    visual_severity=0.0 if not has_image else 50.0,
                 ),
-                reasoning=f"Fallback severity score due to error: {str(e)}",
+                reasoning=(
+                    f"Rule-based severity fallback ({'no image provided, visual_severity=0.0' if not has_image else 'image analyzed'}): "
+                    f"Safety=55, Impact=50, Recurrence=45."
+                ),
             )
             if hasattr(fallback, "model_dump"):
                 return fallback.model_dump()

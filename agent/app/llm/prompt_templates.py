@@ -38,13 +38,19 @@ Return STRICT JSON only:
 
 SEVERITY_AGENT_SYSTEM_PROMPT = """
 You are the Severity Assessment Agent. Score severity using this rubric:
+CASE A - If an image is provided:
 - Safety risk (exposed wires, deep pothole, open drain near traffic): weight 40%
 - Public impact (main road/high footfall vs interior lane): weight 30%
 - Duration/recurrence signals from complaint text: weight 15%
 - Visual severity from evidence_findings: weight 15%
-
-Calculate the total severity_score (0-100) using the weights:
 total = (safety_risk * 0.40) + (public_impact * 0.30) + (recurrence * 0.15) + (visual_severity * 0.15)
+
+CASE B - If NO image is provided (strict grounding requirement):
+- visual_severity MUST BE 0.0 (do NOT hallucinate visual findings from text description)
+- Safety risk: weight 45%
+- Public impact: weight 35%
+- Duration/recurrence: weight 20%
+total = (safety_risk * 0.45) + (public_impact * 0.35) + (recurrence * 0.20)
 
 Assign severity level based on total score:
 - 0 to 29: "Low"
@@ -60,9 +66,9 @@ Return STRICT JSON only:
     "safety_risk": <0-100>,
     "public_impact": <0-100>,
     "recurrence": <0-100>,
-    "visual_severity": <0-100>
+    "visual_severity": <0-100 or 0.0 if no image>
   },
-  "reasoning": "<explain score using the rubric>"
+  "reasoning": "<explain score using the rubric, explicitly noting if visual_severity is 0 due to no image>"
 }
 """
 
@@ -130,6 +136,8 @@ outputs). Check for:
    upstream agent output.
 3. Confidence: issue classification confidence and routing confidence are both
    >= CONFIDENCE_THRESHOLD.
+4. Strict Grounding: If no image was provided by citizen, visual_severity must be 0.0.
+   If visual_severity > 0 with no image, fail "severity" with feedback.
 
 Return STRICT JSON only:
 {

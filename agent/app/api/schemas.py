@@ -62,6 +62,7 @@ class IncidentResult(BaseModel):
     location_summary: str = Field(...)
     citizen_facing_summary: str = Field(...)
     immediate_actions_recommended: List[str] = Field(default_factory=list)
+    reasoning: str = Field(default="", description="Reasoning and compilation summary")
 
 class WorkflowResult(BaseModel):
     status: str = Field(default="Submitted")
@@ -101,3 +102,8 @@ class TicketOutput(BaseModel):
     audit_trail: List[Dict[str, Any]] = Field(default_factory=list)
     raw_incident: Optional[Dict[str, Any]] = None
     workflow: Optional[Dict[str, Any]] = None
+    severity_score: Optional[float] = None
+    severity_breakdown: Optional[Dict[str, Any]] = None
+    issue_confidence: Optional[float] = None
+    routing_confidence: Optional[float] = None
+    grounding_score: Optional[float] = None

@@ -1,58 +1,67 @@
 import asyncio
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 class Executor:
     """
-    Executes stages of specialist agents either concurrently or individually,
+    Executes stages of specialist agents either with pacing delays or individually,
     updating the shared state blackboard.
     """
 
-    def __init__(self, agent_registry: Dict[str, Any]):
+    def __init__(self, agent_registry: Dict[str, Any], agent_delay: Optional[float] = None):
         self.agent_registry = agent_registry
+        self.agent_delay = (
+            agent_delay
+            if agent_delay is not None
+            else getattr(settings, "AGENT_DELAY_SECONDS", 5.0)
+        )
 
     async def run_stage(self, agent_names: List[str], state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Runs all specified agents concurrently using asyncio.gather.
-        Merges results into state under keys matching the agent name.
+        Runs all specified agents for this stage with an enforced delay (default 5s)
+        within every agent execution to completely prevent API rate limits and
+        provide steady blackboard state updates.
         """
-        tasks = []
-        valid_agent_names = []
+        valid_agent_names = [name for name in agent_names if name in self.agent_registry]
 
-        for name in agent_names:
-            agent = self.agent_registry.get(name)
-            if not agent:
-                logger.error(f"Agent '{name}' not found in agent_registry.")
-                continue
-            valid_agent_names.append(name)
-            tasks.append(agent.run(state))
-
-        if not tasks:
+        if not valid_agent_names:
             return state
 
-        logger.info(f"Concurrently executing agents: {valid_agent_names}")
-        results = await asyncio.gather(*tasks, return_exceptions=True)
+        logger.info(f"Executing stage with agents: {valid_agent_names} (with {self.agent_delay}s delay per agent)")
 
-        for name, res in zip(valid_agent_names, results):
-            if isinstance(res, Exception):
-                logger.error(f"Agent {name} encountered unhandled exception: {res}", exc_info=res)
-                state[name] = {"error": str(res)}
-            else:
+        for name in valid_agent_names:
+            agent = self.agent_registry[name]
+
+            if self.agent_delay > 0:
+                logger.info(f"[Executor] Pausing for {self.agent_delay}s delay before executing '{name}' agent...")
+                await asyncio.sleep(self.agent_delay)
+
+            logger.info(f"[Executor] Executing agent '{name}'...")
+            try:
+                res = await agent.run(state)
                 state[name] = res
+            except Exception as e:
+                logger.error(f"Agent {name} encountered unhandled exception: {e}", exc_info=e)
+                state[name] = {"error": str(e)}
 
         return state
 
     async def run_single(self, agent_name: str, state: Dict[str, Any], feedback: str = "") -> Dict[str, Any]:
         """
-        Executes a single agent, passing feedback for corrective retry,
+        Executes a single agent with the pacing delay, passing feedback for corrective retry,
         and updates state.
         """
         agent = self.agent_registry.get(agent_name)
         if not agent:
             logger.error(f"Agent '{agent_name}' not found in registry.")
             return state
+
+        if self.agent_delay > 0:
+            logger.info(f"[Executor] Pausing for {self.agent_delay}s delay before retry execution of '{agent_name}'...")
+            await asyncio.sleep(self.agent_delay)
 
         logger.info(f"Re-running agent '{agent_name}' with corrective feedback: {feedback}")
         try:

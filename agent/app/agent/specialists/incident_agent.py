@@ -73,6 +73,9 @@ class IncidentAgent:
                 response["citizen_facing_summary"] = "Your complaint has been logged and assigned for resolution."
             if not response.get("immediate_actions_recommended"):
                 response["immediate_actions_recommended"] = ["Inspect location", "Dispatch field crew"]
+            if not response.get("reasoning"):
+                actions_str = ", ".join(response["immediate_actions_recommended"][:2])
+                response["reasoning"] = f"Compiled actionable incident ticket '{response['title']}' for {dept} ({priority} Priority). Recommended actions: {actions_str}."
 
             validated = IncidentResult(**response)
             if hasattr(validated, "model_dump"):
@@ -89,7 +92,8 @@ class IncidentAgent:
                 department=str(state.get("routing", {}).get("primary_department", "General Municipal Office")),
                 location_summary="Reported location",
                 citizen_facing_summary="Your issue has been recorded and submitted for municipal review.",
-                immediate_actions_recommended=["Schedule preliminary inspection"],
+                immediate_actions_recommended=["Schedule preliminary inspection", "Dispatch maintenance crew"],
+                reasoning=f"Compiled standard civic incident ticket assigned to {state.get('routing', {}).get('primary_department', 'General Municipal Office')}.",
             )
             if hasattr(fallback, "model_dump"):
                 return fallback.model_dump()

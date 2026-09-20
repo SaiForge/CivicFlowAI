@@ -20,7 +20,7 @@ try:
             extra="ignore",
         )
 
-        LLM_PROVIDER: str = "gemini"  # "gemini", "openai", "auto"
+        LLM_PROVIDER: str = "openrouter"  # "openrouter", "gemini", "openai", "auto"
         OPENAI_API_KEY: str = ""
         MODEL_NAME: str = "gpt-4o-mini"
         VISION_MODEL_NAME: str = "gpt-4o-mini"
@@ -29,6 +29,11 @@ try:
         GOOGLE_API_KEY: str = ""
         GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
 
+        OPENROUTER_API_KEY: str = ""
+        OPENROUTER_MODEL_NAME: str = "openai/gpt-4o-mini"
+        OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+
+        AGENT_DELAY_SECONDS: float = 5.0
         MAX_RETRIES: int = 2
         CONFIDENCE_THRESHOLD: float = 0.7
         DATABASE_URL: str = "sqlite:///./civic.db"
@@ -39,13 +44,17 @@ except ImportError:
         from pydantic import BaseSettings
 
         class Settings(BaseSettings):
-            LLM_PROVIDER: str = "gemini"
+            LLM_PROVIDER: str = "openrouter"
             OPENAI_API_KEY: str = ""
             MODEL_NAME: str = "gpt-4o-mini"
             VISION_MODEL_NAME: str = "gpt-4o-mini"
             GEMINI_API_KEY: str = ""
             GOOGLE_API_KEY: str = ""
             GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+            OPENROUTER_API_KEY: str = ""
+            OPENROUTER_MODEL_NAME: str = "openai/gpt-4o-mini"
+            OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+            AGENT_DELAY_SECONDS: float = 5.0
             MAX_RETRIES: int = 2
             CONFIDENCE_THRESHOLD: float = 0.7
             DATABASE_URL: str = "sqlite:///./civic.db"
@@ -57,13 +66,17 @@ except ImportError:
     except ImportError:
         class Settings:
             def __init__(self):
-                self.LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
+                self.LLM_PROVIDER = os.getenv("LLM_PROVIDER", "openrouter")
                 self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
                 self.MODEL_NAME = os.getenv("MODEL_NAME", "gpt-4o-mini")
                 self.VISION_MODEL_NAME = os.getenv("VISION_MODEL_NAME", "gpt-4o-mini")
                 self.GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
                 self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
                 self.GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+                self.OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+                self.OPENROUTER_MODEL_NAME = os.getenv("OPENROUTER_MODEL_NAME", "openai/gpt-4o-mini")
+                self.OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+                self.AGENT_DELAY_SECONDS = float(os.getenv("AGENT_DELAY_SECONDS", "5.0"))
                 self.MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))
                 self.CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.7"))
                 self.DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./civic.db")
