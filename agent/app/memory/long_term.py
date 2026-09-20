@@ -37,6 +37,9 @@ class LongTermMemory:
     def _get_connection(self):
         conn = sqlite3.connect(self.db_file, check_same_thread=False)
         conn.row_factory = sqlite3.Row
+        # Enable Write-Ahead Logging and busy timeout for multi-day concurrency stability
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("PRAGMA busy_timeout = 5000;")
         try:
             yield conn
         finally:
