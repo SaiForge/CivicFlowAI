@@ -5,9 +5,9 @@ variable "resource_group_name" {
 }
 
 variable "location" {
-  description = "Azure region for all resources (e.g. eastus, centralindia, westeurope)"
+  description = "Azure region for all resources (e.g. southeastasia, centralindia, eastasia)"
   type        = string
-  default     = "eastus"
+  default     = "southeastasia"
 }
 
 variable "environment" {
