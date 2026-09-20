@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Component } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import Header from './components/Header';
 import ComplaintDetail from './components/shared/ComplaintDetail';
@@ -11,32 +11,52 @@ import AuthModal from './components/home/AuthModal';
 import AdminDashboard from './components/admin/AdminDashboard';
 import CitizenDashboard from './components/citizen/CitizenDashboard';
 
-// Streamlined page router
-const pageComponents = {
-  admin: {
-    overview:   () => <AdminDashboard />,
-    queue:      () => <AdminDashboard />,
-    agents:     () => <AdminDashboard />,
-    map:        () => <AdminDashboard />,
-    complaints: () => <AdminDashboard />,
-  },
-  citizen: {
-    overview: () => <CitizenDashboard />,
-    myissues: () => <CitizenDashboard />,
-    nearby:   () => <CitizenDashboard />,
-    report:   () => <CitizenDashboard />,
-  },
-};
+// Error Boundary to prevent white screen of death
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error("CivicFlow React ErrorBoundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '3rem 2rem', textAlign: 'center', maxWidth: '600px', margin: '4rem auto', background: '#fff', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#dc2626', marginBottom: '1rem' }}>
+            Application Notice
+          </h2>
+          <p style={{ color: '#475569', fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: 1.5 }}>
+            A rendering exception occurred ({this.state.error?.message || 'Unknown error'}). Click below to reset to the portal view.
+          </p>
+          <button 
+            onClick={() => {
+              this.setState({ hasError: false, error: null });
+              window.location.href = '/';
+            }}
+            style={{ padding: '0.7rem 1.5rem', background: '#b45309', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: 700, fontSize: '0.95rem', cursor: 'pointer' }}
+          >
+            Reload CivicFlow
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const AppContent = () => {
   const { role, activePage, reportFormOpen } = useApp();
 
   const isHome = activePage === 'home';
-  const roleKey = role === 'admin' || role === 'dept' ? 'admin' : 'citizen';
-
-  const PageComponent = pageComponents[roleKey][activePage]
-    || pageComponents[roleKey].overview
-    || (() => null);
+  const isAdmin = role === 'admin' || role === 'dept';
 
   return (
     <div className={`dashboard ${isHome ? 'dashboard-home' : 'dashboard-workspace'}`}>
@@ -56,7 +76,7 @@ const AppContent = () => {
 
           {/* Full-width content area, no sidebar */}
           <div className="civic-content">
-            <PageComponent />
+            {isAdmin ? <AdminDashboard /> : <CitizenDashboard />}
           </div>
         </div>
       )}
@@ -71,9 +91,11 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <AppProvider>
-    <AppContent />
-  </AppProvider>
+  <ErrorBoundary>
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  </ErrorBoundary>
 );
 
 export default App;

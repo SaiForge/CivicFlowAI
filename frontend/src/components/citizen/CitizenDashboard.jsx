@@ -18,6 +18,8 @@ const statusFlow = [
 
 const ComplaintProgress = ({ complaint }) => {
   const { openDetail } = useApp();
+  if (!complaint) return null;
+
   const currentIdx = statusFlow.findIndex(s => s.key === complaint.status);
 
   return (
@@ -41,14 +43,14 @@ const ComplaintProgress = ({ complaint }) => {
       </div>
 
       <div className="complaint-issue" style={{ margin: '0.4rem 0 0.35rem', fontSize: '1.1rem', fontWeight: 700 }}>
-        {complaint.issue || complaint.title || complaint.category}
+        {complaint.issue || complaint.title || complaint.category || 'Civic Issue'}
       </div>
 
       <div className="complaint-location" style={{ marginBottom: '1rem', fontSize: '0.875rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
         <MapPin size={15} strokeWidth={2} color="#b45309" /> 
-        <span>{complaint.location}</span>
+        <span>{complaint.location || complaint.address || 'Indiranagar, Bengaluru'}</span>
         <span style={{ margin: '0 0.35rem', opacity: 0.4 }}>·</span>
-        <span style={{ color: '#b45309', fontWeight: 600 }}>Priority: {complaint.priority}</span>
+        <span style={{ color: '#b45309', fontWeight: 600 }}>Priority: {complaint.priority || 'Normal'}</span>
       </div>
 
       {/* Visual Resolution Progress Flow */}
@@ -80,11 +82,17 @@ const ComplaintProgress = ({ complaint }) => {
 const CitizenDashboard = () => {
   const { setReportFormOpen, complaintsList, currentUser, activePage } = useApp();
 
-  const currentComplaints = complaintsList || [];
-  // User's own complaints
-  const myComplaints = currentComplaints.filter(c => 
-    c.citizenId === currentUser?.id || c.citizenName === currentUser?.name || c.id?.startsWith('TICK-') || c.id?.startsWith('CMP-')
-  );
+  const currentComplaints = Array.isArray(complaintsList) ? complaintsList : [];
+  
+  // Safely match user's own complaints without throwing
+  const myComplaints = currentComplaints.filter(c => {
+    if (!c) return false;
+    const cid = String(c.id || '');
+    return c.citizenId === currentUser?.id || 
+           c.citizenName === currentUser?.name || 
+           cid.startsWith('TICK-') || 
+           cid.startsWith('CMP-');
+  });
 
   const resolvedCount = myComplaints.filter(c => c.status === 'Resolved').length;
   const inProgressCount = myComplaints.filter(c => c.status === 'In Progress' || c.status === 'Triaged').length;
