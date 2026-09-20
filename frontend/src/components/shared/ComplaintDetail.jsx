@@ -130,10 +130,10 @@ const ComplaintDetail = () => {
               <div className="detail-section-title">Uploaded Evidence ({c.images.length})</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
                 {c.images.map((img) => (
-                  <a key={img.id} href={`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img.url}`} target="_blank" rel="noopener noreferrer">
+                  <a key={img.id} href={`${import.meta.env.VITE_API_URL || ''}${img.url}`} target="_blank" rel="noopener noreferrer">
                     {img.mime_type?.startsWith('image/') ? (
                       <img
-                        src={`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${img.url}`}
+                        src={`${import.meta.env.VITE_API_URL || ''}${img.url}`}
                         alt={img.original_filename || 'evidence'}
                         style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: '0.375rem', border: '1px solid var(--border)' }}
                       />

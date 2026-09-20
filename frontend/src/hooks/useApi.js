@@ -67,11 +67,11 @@ export function useComplaints(params = {}, pollInterval = 4000) {
 }
 
 export function useComplaint(id) {
-  return useApiCall(() => complaintsApi.get(id), [id], 3000);
+  return useApiCall(() => (id ? complaintsApi.get(id) : Promise.resolve(null)), [id], id ? 3000 : 0);
 }
 
 export function useComplaintTrace(id) {
-  return useApiCall(() => complaintsApi.getTrace(id), [id], 0);
+  return useApiCall(() => (id ? complaintsApi.getTrace(id) : Promise.resolve(null)), [id], 0);
 }
 
 // ── Incidents ─────────────────────────────────────────────────────────────────

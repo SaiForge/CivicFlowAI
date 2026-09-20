@@ -40,7 +40,7 @@ export const AppProvider = ({ children }) => {
   const triggerRefresh = () => setRefreshTrigger((prev) => prev + 1);
 
   useEffect(() => {
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    const apiBase = import.meta.env.VITE_API_URL || '';
     let es = null;
     let reconnectTimer = null;
 
