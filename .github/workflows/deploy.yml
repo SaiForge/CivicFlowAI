@@ -85,17 +85,21 @@ jobs:
             echo "=================================================="
 
             APP_DIR="/home/${{ secrets.AZURE_VM_USERNAME }}/CivicFlowAI"
+            REPO_AUTH_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
-            # 1. Clone repository if not present, otherwise pull latest commit
-            if [ ! -d "$APP_DIR" ]; then
-              echo "--> Cloning repository into $APP_DIR..."
-              git clone https://github.com/${{ github.repository }}.git "$APP_DIR"
+            # 1. Clone repository if not present or partially cloned, otherwise pull latest commit
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "--> Freshly cloning private repository into $APP_DIR..."
+              rm -rf "$APP_DIR"
+              git clone "$REPO_AUTH_URL" "$APP_DIR"
             fi
 
             cd "$APP_DIR"
             echo "--> Pulling latest code from main branch..."
+            git remote set-url origin "$REPO_AUTH_URL"
             git fetch origin main
             git reset --hard origin/main
+            git remote set-url origin "https://github.com/${{ github.repository }}.git"
 
             # 2. Configure Production Environment Variables (.env)
             echo "--> Writing production .env configuration..."
