@@ -1,15 +1,21 @@
 import React from 'react';
-import { complaints } from '../../data/mockData';
 import { useApp } from '../../context/AppContext';
 import ComplaintCard from '../shared/ComplaintCard';
+import { Loader2 } from 'lucide-react';
 
 const PRIORITY_ORDER = { Critical: 0, High: 1, Medium: 2, Low: 3 };
 
-const PriorityQueue = ({ dept }) => {
+const PriorityQueue = ({ dept, complaints = [], loading = false }) => {
   const { openDetail } = useApp();
   const queue = complaints
-    .filter(c => c.dept === dept && !['Resolved', 'Closed'].includes(c.status))
+    .filter(c => !['Resolved', 'Closed'].includes(c.status))
     .sort((a, b) => (PRIORITY_ORDER[a.priority] || 3) - (PRIORITY_ORDER[b.priority] || 3));
+
+  if (loading) return (
+    <div className="card civic-section-card" style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+      <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-muted)' }} />
+    </div>
+  );
 
   if (!queue.length) {
     return (

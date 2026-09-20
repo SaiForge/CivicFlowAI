@@ -71,12 +71,14 @@ const indianCivicDomains = [
 ];
 
 const HomePage = () => {
-  const { openAuthModal, setRole, setActivePage, setIsAuthenticated } = useApp();
+  const { openAuthModal, setActivePage, isAuthenticated, currentUser } = useApp();
 
   const handleLaunchRole = (roleName) => {
-    setRole(roleName);
-    setActivePage('overview');
-    setIsAuthenticated(true);
+    if (isAuthenticated && currentUser?.role === roleName) {
+      setActivePage('overview');
+    } else {
+      openAuthModal('login');
+    }
   };
 
   return (

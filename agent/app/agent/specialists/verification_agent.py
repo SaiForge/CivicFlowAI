@@ -76,7 +76,8 @@ class VerificationAgent:
         # 4. Evidence Grounding vs Severity Check
         sev_level = str(severity.get("severity", "Low")).capitalize()
         grounding = float(evidence.get("grounding_score", 1.0))
-        if sev_level in ["High", "Critical"] and grounding < 0.4:
+        is_sensitive = bool(input_data.get("is_sensitive", False))
+        if sev_level in ["High", "Critical"] and grounding < 0.4 and not is_sensitive:
             if "severity" not in failed_agents:
                 failed_agents.append("severity")
             feedback_dict["severity"] = (

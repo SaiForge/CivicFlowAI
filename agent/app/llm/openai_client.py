@@ -435,6 +435,12 @@ class LLMClient:
                             raise ValueError(f"Failed to parse valid JSON from OpenRouter: {raw_content}")
 
                     elif response.status_code in [429, 500, 502, 503, 504]:
+                        err_text = response.text
+                        # If daily quota / credits exhausted, don't back off in vain
+                        if response.status_code == 429 and ("free-models-per-day" in err_text or "credit" in err_text.lower()):
+                            logger.warning(f"[OpenRouter] Quota/credits exhausted: {err_text[:120]}. Failing fast to fallback.")
+                            raise RuntimeError(f"OpenRouter quota exhausted (HTTP 429): {err_text[:150]}")
+
                         if attempt < max_attempts:
                             retry_hdr = response.headers.get("Retry-After") or response.headers.get("retry-after")
                             if retry_hdr and retry_hdr.isdigit():

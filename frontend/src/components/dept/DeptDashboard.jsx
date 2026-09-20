@@ -4,10 +4,11 @@ import StatCard from '../shared/StatCard';
 import PriorityQueue from './PriorityQueue';
 import ComplaintTable from './ComplaintTable';
 import HotspotMap from '../admin/HotspotMap';
-import { complaints, DEPARTMENTS, STATUS } from '../../data/mockData';
+import { useComplaints } from '../../hooks/useApi';
+import { DEPARTMENTS } from '../../data/mockData';
 import {
   FilePlus2, ClipboardCheck, Timer, Hourglass, CheckCircle2, AlertTriangle,
-  Building2, ShieldCheck, Flame, Clock
+  Building2, ShieldCheck, Clock
 } from 'lucide-react';
 
 const deptHindiMap = {
@@ -25,11 +26,14 @@ const DeptDashboard = () => {
   const { activeDept, setActiveDept } = useApp();
   const [activeSection, setActiveSection] = useState('Priority Queue');
   const deptInfo = DEPARTMENTS[activeDept] || DEPARTMENTS.road;
-  const deptComplaints = complaints.filter(c => c.dept === activeDept);
 
-  const count = (status) => deptComplaints.filter(c => c.status === status).length;
-  const newCount  = deptComplaints.filter(c => c.status === STATUS.SUBMITTED).length;
-  const escalated = deptComplaints.filter(c => c.status === STATUS.ESCALATED).length;
+  // Fetch complaints filtered by dept
+  const { data: deptComplaints, loading } = useComplaints({ dept: activeDept });
+  const complaints = deptComplaints || [];
+
+  const count = (status) => complaints.filter(c => c.status === status).length;
+  const newCount  = complaints.filter(c => c.status === 'Submitted').length;
+  const escalated = complaints.filter(c => c.status === 'Escalated').length;
 
   return (
     <div className="civic-page">
@@ -48,11 +52,11 @@ const DeptDashboard = () => {
           </p>
         </div>
 
-        {/* Department Switcher Pills */}
+        {/* Department Switcher */}
         <div className="dept-switcher-wrap">
           <div className="section-tabs" style={{ flexWrap: 'wrap' }}>
             {Object.values(DEPARTMENTS).map(d => (
-              <button 
+              <button
                 key={d.id}
                 className={`section-tab ${activeDept === d.id ? 'section-tab-active' : ''}`}
                 onClick={() => setActiveDept(d.id)}
@@ -64,7 +68,7 @@ const DeptDashboard = () => {
         </div>
       </div>
 
-      {/* ── 48-Hour SLA Field Status Banner ── */}
+      {/* ── SLA Banner ── */}
       <div className="card dept-sla-banner">
         <div className="dept-sla-banner-inner">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
@@ -92,12 +96,12 @@ const DeptDashboard = () => {
 
       {/* ── 6-Metric Stat Grid ── */}
       <div className="stat-grid">
-        <StatCard icon={<FilePlus2     size={18} strokeWidth={1.75}/>} label="New In Ward"    value={newCount}                          trend="Needs Review"  trendUp={false} />
-        <StatCard icon={<ClipboardCheck size={18} strokeWidth={1.75}/>} label="Field Assigned" value={count(STATUS.ASSIGNED)}             trend="Active Duty"   trendUp />
-        <StatCard icon={<Timer         size={18} strokeWidth={1.75}/>} label="Under Repair"   value={count(STATUS.IN_PROGRESS)}          trend="On Site"       trendUp />
-        <StatCard icon={<Hourglass     size={18} strokeWidth={1.75}/>} label="Verification"   value={count(STATUS.VERIFICATION_PENDING)} trend="Proof Uploaded" trendUp={false} />
-        <StatCard icon={<CheckCircle2  size={18} strokeWidth={1.75}/>} label="Resolved"       value={count(STATUS.RESOLVED)}             trend="+12 this week" trendUp />
-        <StatCard icon={<AlertTriangle size={18} strokeWidth={1.75}/>} label="SLA Breached"   value={escalated}                         trend="Escalated"     trendUp={false} accent={escalated > 0} />
+        <StatCard icon={<FilePlus2     size={18} strokeWidth={1.75}/>} label="New In Ward"    value={loading ? '…' : newCount}                          trend="Needs Review"  trendUp={false} />
+        <StatCard icon={<ClipboardCheck size={18} strokeWidth={1.75}/>} label="Field Assigned" value={loading ? '…' : count('Assigned')}             trend="Active Duty"   trendUp />
+        <StatCard icon={<Timer         size={18} strokeWidth={1.75}/>} label="Under Repair"   value={loading ? '…' : count('In Progress')}          trend="On Site"       trendUp />
+        <StatCard icon={<Hourglass     size={18} strokeWidth={1.75}/>} label="Verification"   value={loading ? '…' : count('Verification Pending')} trend="Proof Uploaded" trendUp={false} />
+        <StatCard icon={<CheckCircle2  size={18} strokeWidth={1.75}/>} label="Resolved"       value={loading ? '…' : count('Resolved')}             trend="+12 this week" trendUp />
+        <StatCard icon={<AlertTriangle size={18} strokeWidth={1.75}/>} label="SLA Breached"   value={loading ? '…' : escalated}                     trend="Escalated"     trendUp={false} accent={escalated > 0} />
       </div>
 
       {/* ── Section Tabs ── */}
@@ -118,9 +122,9 @@ const DeptDashboard = () => {
       </div>
 
       {/* ── Tab Views ── */}
-      {activeSection === 'Priority Queue'       && <PriorityQueue dept={activeDept} />}
-      {activeSection === 'Department Complaints' && <ComplaintTable dept={activeDept} />}
-      {activeSection === 'Ward Heatmap'         && <HotspotMap filterDept={activeDept} />}
+      {activeSection === 'Priority Queue'        && <PriorityQueue dept={activeDept} complaints={complaints} loading={loading} />}
+      {activeSection === 'Department Complaints' && <ComplaintTable dept={activeDept} complaints={complaints} loading={loading} />}
+      {activeSection === 'Ward Heatmap'          && <HotspotMap filterDept={activeDept} />}
     </div>
   );
 };

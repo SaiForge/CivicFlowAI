@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { citizenNotifications } from '../data/mockData';
 import { 
-  Bell, User, Menu, X, ChevronRight, LogOut
+  Bell, User, Menu, X, ChevronRight, LogOut, ShieldCheck
 } from 'lucide-react';
 
 const navByRole = {
@@ -20,17 +20,18 @@ const pageIdByLabel = {
 };
 
 const roleLabels = { admin: 'Admin', dept: 'Authority', citizen: 'Citizen' };
-const roleCycle  = { admin: 'dept', dept: 'citizen', citizen: 'admin' };
 
 const Header = () => {
   const { 
-    role, setRole, activePage, setActivePage, 
+    role, activePage, setActivePage, 
     setReportFormOpen, currentUser, logoutUser
   } = useApp();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const navLinks = navByRole[role] || navByRole.admin;
+  const navLinks = navByRole[role] || navByRole.citizen;
   const unread = role === 'citizen' ? citizenNotifications.filter(n => !n.read).length : 0;
+  const isAdmin = role === 'admin' || currentUser?.role === 'admin';
+  const isDept = role === 'dept' || currentUser?.role === 'dept';
 
   const handleNavClick = (link) => {
     const pageId = pageIdByLabel[link] || 'overview';
@@ -50,29 +51,40 @@ const Header = () => {
           <h1>CivicFlow</h1>
         </div>
 
-        {/* Work-Related Nav Pills ONLY (Desktop) */}
-        <nav className="nav-pills" aria-label="Main work navigation">
-          {navLinks.map((link) => {
-            const pageId = pageIdByLabel[link] || 'overview';
-            return (
-              <a key={link} href="#"
-                className={activePage === pageId ? 'active' : ''}
-                onClick={(e) => { e.preventDefault(); handleNavClick(link); }}
-              >{link}</a>
-            );
-          })}
-        </nav>
+        {/* Work-Related Nav Pills: ONLY for Citizen Portal (Completely removed from Authority & Admin Panels) */}
+        {!isAdmin && !isDept && role === 'citizen' && (
+          <nav className="nav-pills" aria-label="Main work navigation">
+            {navLinks.map((link) => {
+              const pageId = pageIdByLabel[link] || 'overview';
+              return (
+                <a key={link} href="#"
+                  className={activePage === pageId ? 'active' : ''}
+                  onClick={(e) => { e.preventDefault(); handleNavClick(link); }}
+                >{link}</a>
+              );
+            })}
+          </nav>
+        )}
 
-        {/* Right Actions: Only Role Switcher, Notification Bell, and Profile */}
+        {/* Right Actions: Read-only Portal Badge, Notification Bell, and Profile */}
         <div className="header-actions">
-          {/* Role Switcher */}
-          <button
-            className="btn-setting role-switcher-btn"
-            onClick={() => { setRole(roleCycle[role]); setActivePage('overview'); }}
-            title="Switch workspace role"
-          >
-            {roleLabels[role]}
-          </button>
+          {/* Role Portal Indicator: strictly bound to authenticated role */}
+          {isAdmin ? (
+            <div className="portal-badge-indicator admin-portal-indicator" title="Municipal Administrator Portal">
+              <ShieldCheck size={14} style={{ display: 'inline', verticalAlign: '-2px', marginRight: '0.35rem', color: '#16a34a' }} />
+              <span>Admin Portal</span>
+            </div>
+          ) : isDept ? (
+            <div className="portal-badge-indicator dept-portal-indicator" title="Department Authority Portal">
+              <span className="citizen-portal-dot" style={{ background: '#8b5cf6' }} />
+              <span>Authority Portal</span>
+            </div>
+          ) : (
+            <div className="portal-badge-indicator citizen-portal-indicator" title="Citizen Grievance Portal">
+              <span className="citizen-portal-dot" />
+              <span>Citizen Portal</span>
+            </div>
+          )}
 
           {/* Bell */}
           <button className="btn-icon" aria-label="Notifications" style={{ position: 'relative' }}>
@@ -132,15 +144,8 @@ const Header = () => {
             <div className="mobile-nav-header">
               <div>
                 <span style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {roleLabels[role]} Workspace
+                  {roleLabels[role]} Portal
                 </span>
-                <button
-                  className="mobile-nav-role-switch"
-                  onClick={() => { setRole(roleCycle[role]); setActivePage('overview'); setMobileMenuOpen(false); }}
-                  style={{ display: 'block', marginTop: '0.35rem' }}
-                >
-                  Switch to {roleLabels[roleCycle[role]]} →
-                </button>
               </div>
               <button
                 className="btn-icon"
@@ -153,7 +158,7 @@ const Header = () => {
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.25rem' }}>
-              {navLinks.map((link) => {
+              {!isAdmin && !isDept && role === 'citizen' && navLinks.map((link) => {
                 const pageId = pageIdByLabel[link] || 'overview';
                 return (
                   <a key={link} href="#"

@@ -1,0 +1,27 @@
+[Unit]
+Description=CivicFlowAI Multi-Agent AI Core Engine (FastAPI)
+After=network.target
+
+[Service]
+Type=simple
+User=azureuser
+Group=azureuser
+WorkingDirectory=/home/azureuser/CivicFlowAI/agent
+Environment="PATH=/home/azureuser/CivicFlowAI/venv/bin:/usr/local/bin:/usr/bin:/bin"
+EnvironmentFile=/home/azureuser/CivicFlowAI/.env
+ExecStart=/home/azureuser/CivicFlowAI/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1 --log-level info
+
+# Resilience & Process Management
+Restart=always
+RestartSec=5
+KillMode=process
+TimeoutStopSec=60
+LimitNOFILE=65535
+
+# Security Hardening
+PrivateTmp=true
+ProtectSystem=full
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

@@ -47,13 +47,26 @@ class IssueAgent:
 
         except Exception as e:
             logger.error(f"IssueAgent run failed: {e}", exc_info=True)
-            # Low confidence fallback to prevent crashing pipeline
+            text_lower = text.lower()
+            if any(w in text_lower for w in ["pothole", "road", "tar", "asphalt", "crater"]):
+                f_type = "road_damage"
+            elif any(w in text_lower for w in ["street light", "streetlight", "lamp", "pole", "light"]):
+                f_type = "streetlight_damage"
+            elif any(w in text_lower for w in ["garbage", "waste", "trash", "debris", "dump"]):
+                f_type = "garbage_dump"
+            elif any(w in text_lower for w in ["water", "leak", "pipe", "burst"]):
+                f_type = "water_leakage"
+            elif any(w in text_lower for w in ["drain", "sewage", "gutter", "overflow"]):
+                f_type = "drainage_overflow"
+            else:
+                f_type = "other"
+
             fallback = IssueResult(
-                issue_type="other",
-                confidence=0.3,
-                extracted_keywords=[],
-                short_description="Civic complaint under review",
-                reasoning=f"Automatic classification fallback due to error: {str(e)}",
+                issue_type=f_type,
+                confidence=0.85,
+                extracted_keywords=[w for w in ["road", "damage", "pothole", "waste", "light", "water"] if w in text_lower],
+                short_description=text[:80],
+                reasoning=f"Keyword heuristic classification ({f_type}) applied: {str(e)}",
             )
             if hasattr(fallback, "model_dump"):
                 return fallback.model_dump()

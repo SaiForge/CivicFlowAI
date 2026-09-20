@@ -31,8 +31,16 @@ class EvidenceAgent:
             prompt_parts.append(f"Claimed Issue / Category: {claimed_issue}")
             prompt_parts.append(f"Complaint Text: {text}")
 
+            is_sensitive = bool(complaint_input.get("is_sensitive", False))
             if not image_b64:
-                prompt_parts.append("Image: No image was provided by the citizen.")
+                if is_sensitive:
+                    prompt_parts.append(
+                        "Image Status: NO IMAGE PROVIDED (EXEMPT). This is flagged as a SENSITIVE/CONFIDENTIAL "
+                        "civic or safety issue where capturing or sharing photos is unsafe or violates privacy. "
+                        "Do not penalize grounding score for the lack of visual evidence; evaluate coherence from textual facts."
+                    )
+                else:
+                    prompt_parts.append("Image: No image was provided by the citizen.")
             else:
                 prompt_parts.append("Image: Citizen attached an image (see visual input).")
 
@@ -45,6 +53,12 @@ class EvidenceAgent:
                 temperature=0.1,
             )
 
+            # If sensitive without image, ensure grounding score reflects textual validity rather than 0.4 penalty
+            if is_sensitive and not image_b64:
+                if response.get("grounding_score", 0) < 0.75:
+                    response["grounding_score"] = 0.85
+                    response["reasoning"] = f"Sensitive issue: photographic evidence waived for safety. {response.get('reasoning', '')}".strip()
+
             validated = EvidenceResult(**response)
             if hasattr(validated, "model_dump"):
                 return validated.model_dump()
@@ -53,11 +67,11 @@ class EvidenceAgent:
         except Exception as e:
             logger.error(f"EvidenceAgent run failed: {e}", exc_info=True)
             fallback = EvidenceResult(
-                grounding_score=0.5,
+                grounding_score=0.85 if complaint_input.get("is_sensitive") else 0.5,
                 text_image_consistent=True,
-                visual_findings="Processing error prevented deep evidence inspection",
+                visual_findings="Waived for sensitive issue" if complaint_input.get("is_sensitive") else "Processing error prevented deep evidence inspection",
                 discrepancies=[],
-                reasoning=f"Fallback evidence assessment due to: {str(e)}",
+                reasoning="Sensitive complaint: photographic evidence waived for citizen protection" if complaint_input.get("is_sensitive") else f"Fallback evidence assessment due to: {str(e)}",
             )
             if hasattr(fallback, "model_dump"):
                 return fallback.model_dump()

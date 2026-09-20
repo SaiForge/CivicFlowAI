@@ -63,4 +63,9 @@ logs/
 tmp/
 temp/
 
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
 agent/.env

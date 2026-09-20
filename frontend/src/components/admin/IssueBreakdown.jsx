@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { categoryBreakdown } from '../../data/mockData';
-import { 
-  Car, Trash2, Droplets, Waves, Lightbulb, 
-  Building2, Layers, ArrowUpRight
+import { useCategoryBreakdown } from '../../hooks/useApi';
+import {
+  Car, Trash2, Droplets, Waves, Lightbulb,
+  Building2, Layers, Loader2
 } from 'lucide-react';
 
 const categoryMeta = {
@@ -16,8 +16,10 @@ const categoryMeta = {
 };
 
 const IssueBreakdown = () => {
-  const [metricView, setMetricView] = useState('volume'); // 'volume' | 'resolution'
-  const totalComplaints = categoryBreakdown.reduce((sum, c) => sum + c.count, 0);
+  const [metricView, setMetricView] = useState('volume');
+  const { data, loading } = useCategoryBreakdown();
+  const categoryBreakdown = data || [];
+  const totalComplaints = categoryBreakdown.reduce((sum, c) => sum + c.count, 0) || 1;
 
   return (
     <div className="card civic-section-card breakdown-card">
@@ -28,7 +30,7 @@ const IssueBreakdown = () => {
             Issue Category Breakdown
           </h4>
           <span className="card-sub" style={{ display: 'block', marginTop: '0.2rem' }}>
-            {totalComplaints} total complaints across 7 civic domains
+            {totalComplaints} total complaint{totalComplaints === 1 ? '' : 's'} across {categoryBreakdown.length} active civic domain{categoryBreakdown.length === 1 ? '' : 's'}
           </span>
         </div>
 
@@ -80,7 +82,7 @@ const IssueBreakdown = () => {
 
           const activePct = metricView === 'volume' ? volumePct : resolutionPct;
           const fillWidth = metricView === 'volume' 
-            ? `${Math.min(100, Math.round((cat.count / 38) * 100))}%` 
+            ? `${volumePct}%` 
             : `${resolutionPct}%`;
 
           return (

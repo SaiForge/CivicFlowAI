@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { activityFeed } from '../../data/mockData';
+import { useActivityFeed } from '../../hooks/useApi';
 import { useApp } from '../../context/AppContext';
-import { 
-  AlertTriangle, UserCheck, ThumbsUp, Camera, 
-  TrendingUp, CheckCircle2, ChevronRight, Clock
+import {
+  AlertTriangle, UserCheck, ThumbsUp, Camera,
+  TrendingUp, CheckCircle2, ChevronRight, Clock, Loader2
 } from 'lucide-react';
 
 const eventTypeMeta = {
@@ -17,13 +17,10 @@ const eventTypeMeta = {
 
 const ActivityFeed = () => {
   const { openDetail } = useApp();
-  const [filter, setFilter] = useState('all'); // 'all' | 'urgent' | 'resolved'
+  const [filter, setFilter] = useState('all');
+  const { data, loading } = useActivityFeed(20);
+  const activityFeed = data || [];
 
-  const filteredItems = activityFeed.filter((item) => {
-    if (filter === 'urgent') return item.type === 'alert' || item.type === 'escalate';
-    if (filter === 'resolved') return item.type === 'resolved' || item.type === 'evidence';
-    return true;
-  });
 
   return (
     <div className="card civic-section-card activity-stream-card">
@@ -45,31 +42,26 @@ const ActivityFeed = () => {
         </div>
 
         {/* Filter Pills */}
-        <div className="activity-filter-row">
-          <button
-            className={`breakdown-pill-btn ${filter === 'all' ? 'active' : ''}`}
-            onClick={() => setFilter('all')}
-          >
+      <div className="activity-filter-row">
+          <button className={`breakdown-pill-btn ${filter === 'all' ? 'active' : ''}`} onClick={() => setFilter('all')}>
             All ({activityFeed.length})
           </button>
-          <button
-            className={`breakdown-pill-btn ${filter === 'urgent' ? 'active' : ''}`}
-            onClick={() => setFilter('urgent')}
-          >
-            Urgent
-          </button>
-          <button
-            className={`breakdown-pill-btn ${filter === 'resolved' ? 'active' : ''}`}
-            onClick={() => setFilter('resolved')}
-          >
-            Resolved
-          </button>
+          <button className={`breakdown-pill-btn ${filter === 'urgent' ? 'active' : ''}`} onClick={() => setFilter('urgent')}>Urgent</button>
+          <button className={`breakdown-pill-btn ${filter === 'resolved' ? 'active' : ''}`} onClick={() => setFilter('resolved')}>Resolved</button>
         </div>
       </div>
 
-      {/* Activity List */}
       <div className="activity-list-container">
-        {filteredItems.map((item) => {
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '1.5rem' }}>
+            <Loader2 size={22} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-muted)' }} />
+          </div>
+        )}
+        {!loading && activityFeed.filter((item) => {
+          if (filter === 'urgent') return item.type === 'alert' || item.type === 'escalate';
+          if (filter === 'resolved') return item.type === 'resolved' || item.type === 'evidence';
+          return true;
+        }).map((item) => {
           const meta = eventTypeMeta[item.icon] || eventTypeMeta[item.type] || eventTypeMeta.alert;
           const IconComponent = meta.icon;
 
@@ -120,7 +112,12 @@ const ActivityFeed = () => {
           );
         })}
 
-        {filteredItems.length === 0 && (
+
+        {!loading && activityFeed.filter((item) => {
+          if (filter === 'urgent') return item.type === 'alert' || item.type === 'escalate';
+          if (filter === 'resolved') return item.type === 'resolved' || item.type === 'evidence';
+          return true;
+        }).length === 0 && (
           <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
             No activities matching this filter.
           </div>

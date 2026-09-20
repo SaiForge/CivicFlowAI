@@ -14,6 +14,7 @@ class ComplaintInput(BaseModel):
     audio_base64: Optional[str] = None
     location: Optional[LocationInput] = None
     citizen_id: Optional[str] = None
+    is_sensitive: Optional[bool] = False
 
     def to_dict(self) -> Dict[str, Any]:
         if hasattr(self, "model_dump"):
@@ -107,6 +108,7 @@ class TicketOutput(BaseModel):
     issue_confidence: Optional[float] = None
     routing_confidence: Optional[float] = None
     grounding_score: Optional[float] = None
+    agent_thoughts: Optional[Dict[str, Any]] = None
 
 class GeocodeRequest(BaseModel):
     query: str = Field(..., description="Address, area, or landmark string")

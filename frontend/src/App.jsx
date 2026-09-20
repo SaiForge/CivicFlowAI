@@ -6,6 +6,7 @@ import ReportForm from './components/citizen/ReportForm';
 import HomePage from './components/home/HomePage';
 import OnboardingTourModal from './components/home/OnboardingTourModal';
 import AuthModal from './components/home/AuthModal';
+import IssueProcessingScreen from './components/citizen/IssueProcessingScreen';
 
 // Role dashboards
 import AdminDashboard from './components/admin/AdminDashboard';
@@ -45,14 +46,23 @@ const pageComponents = {
   },
 };
 
+const FallbackComponent = () => null;
+
 const AppContent = () => {
-  const { role, activePage, reportFormOpen } = useApp();
+  const { role, activePage, reportFormOpen, currentUser } = useApp();
 
   const isHome = activePage === 'home';
 
-  const PageComponent = (pageComponents[role] || pageComponents.citizen)[activePage]
-    || pageComponents[role]?.overview
-    || (() => null);
+  // Security barrier: Ensure citizens/unauthenticated users can NEVER render admin or dept components
+  const effectiveRole = (role === 'admin' && currentUser?.role !== 'admin')
+    ? 'citizen'
+    : (role === 'dept' && currentUser?.role !== 'admin' && currentUser?.role !== 'dept')
+    ? 'citizen'
+    : role;
+
+  const PageComponent = (pageComponents[effectiveRole] || pageComponents.citizen)[activePage]
+    || pageComponents[effectiveRole]?.overview
+    || FallbackComponent;
 
   return (
     <div className={`dashboard ${isHome ? 'dashboard-home' : 'dashboard-workspace'}`}>
@@ -80,6 +90,7 @@ const AppContent = () => {
       {/* Global modals */}
       <ComplaintDetail />
       {reportFormOpen && <ReportForm />}
+      <IssueProcessingScreen />
       <AuthModal />
       <OnboardingTourModal />
     </div>

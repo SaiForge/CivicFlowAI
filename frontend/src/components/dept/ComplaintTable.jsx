@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
-import { complaints, DEPARTMENTS } from '../../data/mockData';
+import { DEPARTMENTS } from '../../data/mockData';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge, PriorityBadge } from '../shared/StatusBadge';
+import { Loader2 } from 'lucide-react';
 
-const ComplaintTable = ({ dept }) => {
+const ComplaintTable = ({ dept, complaints = [], loading = false }) => {
   const { openDetail } = useApp();
   const [filterStatus, setFilterStatus] = useState('All');
 
-  const deptComplaints = complaints.filter(c => c.dept === dept);
-  const filtered = filterStatus === 'All' ? deptComplaints : deptComplaints.filter(c => c.status === filterStatus);
-  const statuses = ['All', ...new Set(deptComplaints.map(c => c.status))];
+  const filtered = filterStatus === 'All' ? complaints : complaints.filter(c => c.status === filterStatus);
+  const statuses = ['All', ...new Set(complaints.map(c => c.status))];
+
+  if (loading) return (
+    <div className="card civic-section-card" style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+      <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', color: 'var(--text-muted)' }} />
+    </div>
+  );
 
   const fmtDate = ts => new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 

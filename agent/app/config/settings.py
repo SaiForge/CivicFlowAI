@@ -36,7 +36,7 @@ try:
         AGENT_DELAY_SECONDS: float = 5.0
         MAX_RETRIES: int = 2
         CONFIDENCE_THRESHOLD: float = 0.7
-        DATABASE_URL: str = "sqlite:///./civic.db"
+        DATABASE_URL: str = "postgresql://civicflow:civicflow_secret@postgres:5432/civicflow"
         LOG_LEVEL: str = "INFO"
 
 except ImportError:
@@ -57,7 +57,7 @@ except ImportError:
             AGENT_DELAY_SECONDS: float = 5.0
             MAX_RETRIES: int = 2
             CONFIDENCE_THRESHOLD: float = 0.7
-            DATABASE_URL: str = "sqlite:///./civic.db"
+            DATABASE_URL: str = "postgresql://civicflow:civicflow_secret@postgres:5432/civicflow"
             LOG_LEVEL: str = "INFO"
 
             class Config:
@@ -79,7 +79,7 @@ except ImportError:
                 self.AGENT_DELAY_SECONDS = float(os.getenv("AGENT_DELAY_SECONDS", "5.0"))
                 self.MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))
                 self.CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.7"))
-                self.DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./civic.db")
+                self.DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://civicflow:civicflow_secret@postgres:5432/civicflow")
                 self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
 settings = Settings()

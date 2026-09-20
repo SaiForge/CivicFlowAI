@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { 
   X, User, Mail, Phone, MapPin, Lock, 
-  ArrowRight, ShieldCheck, CheckCircle2, Sparkles
+  ArrowRight, ShieldCheck, Sparkles
 } from 'lucide-react';
 
 const AuthModal = () => {
@@ -23,25 +23,19 @@ const AuthModal = () => {
       registerUser({
         name: formData.name || 'New Citizen',
         email: formData.identifier || 'citizen@civicflow.gov.in',
+        password: formData.password || 'demo123',
         ward: formData.ward || 'Ward 14, Central Zone',
       });
     } else {
       loginUser({
-        name: formData.name || 'Aarav Sharma',
-        email: formData.identifier || 'citizen@civicflow.gov.in',
-        ward: formData.ward || 'Ward 14, MG Road Area',
-        role: 'citizen',
+        email: formData.identifier || 'citizen@civicflow.gov',
+        password: formData.password || 'demo123',
       });
     }
   };
 
   const handleDemoLogin = (roleName, demoName, ward) => {
-    loginUser({
-      name: demoName,
-      email: `${roleName}@civicflow.gov`,
-      ward: ward,
-      role: roleName,
-    });
+    loginUser({ _demo: true, role: roleName, name: demoName, ward });
   };
 
   return (
@@ -170,19 +164,48 @@ const AuthModal = () => {
                 </div>
                 <h3 className="auth-heading">Sign In to CivicFlow</h3>
                 <p className="auth-sub">
-                  Track your active grievances, monitor department SLA, and vote on local community issues.
+                  Track your active grievances, monitor department SLA, or sign in as administrator.
                 </p>
+              </div>
+
+              {/* Default Admin Credentials Banner */}
+              <div className="auth-admin-cred-box">
+                <div className="admin-cred-top">
+                  <div className="admin-cred-title">
+                    <ShieldCheck size={13} color="#b45309" />
+                    <span>Default Administrator Credentials</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="admin-autofill-btn"
+                    onClick={() => setFormData({ ...formData, identifier: 'admin@civicflow.gov', password: 'admin123' })}
+                  >
+                    Auto-Fill Admin
+                  </button>
+                </div>
+                <div className="admin-cred-body">
+                  <div className="admin-cred-row">
+                    <span className="admin-cred-label">Username:</span>
+                    <code className="admin-cred-val">admin@civicflow.gov</code>
+                    <span className="admin-cred-or">or</span>
+                    <code className="admin-cred-val">admin</code>
+                  </div>
+                  <div className="admin-cred-row">
+                    <span className="admin-cred-label">Password:</span>
+                    <code className="admin-cred-val">admin123</code>
+                  </div>
+                </div>
               </div>
 
               <form onSubmit={handleSubmit} className="auth-form">
                 <div className="auth-field">
-                  <label className="auth-label">Mobile Number or Email</label>
+                  <label className="auth-label">Mobile Number, Email, or Username</label>
                   <div className="auth-input-wrap">
                     <Mail size={16} className="auth-input-icon" />
                     <input
                       type="text"
                       className="auth-input"
-                      placeholder="citizen@civicflow.org or mobile"
+                      placeholder="e.g. admin@civicflow.gov or citizen"
                       value={formData.identifier}
                       onChange={(e) => setFormData({ ...formData, identifier: e.target.value })}
                       required
@@ -206,7 +229,7 @@ const AuthModal = () => {
                 </div>
 
                 <button type="submit" className="auth-submit-btn">
-                  <span>Sign In & Open Dashboard</span>
+                  <span>Sign In & Open Workspace</span>
                   <ArrowRight size={16} strokeWidth={2.5} />
                 </button>
               </form>
@@ -225,7 +248,7 @@ const AuthModal = () => {
                 onClick={() => handleDemoLogin('citizen', 'Aarav Sharma (Citizen)', 'Ward 14')}
               >
                 <div className="auth-demo-badge citizen">Citizen</div>
-                <span className="auth-demo-text">Explore Citizen Grievance Portal</span>
+                <span className="auth-demo-text">Citizen Grievance Portal</span>
               </button>
 
               <button
@@ -234,16 +257,16 @@ const AuthModal = () => {
                 onClick={() => handleDemoLogin('dept', 'Eng. Rajesh (Road Dept)', 'Central Zone')}
               >
                 <div className="auth-demo-badge dept">Authority</div>
-                <span className="auth-demo-text">Field Officer & Dispatch Queue</span>
+                <span className="auth-demo-text">Field Officer & Dispatch</span>
               </button>
 
               <button
                 type="button"
                 className="auth-demo-card"
-                onClick={() => handleDemoLogin('admin', 'Dr. Meera (City Admin)', 'Municipal HQ')}
+                onClick={() => handleDemoLogin('admin', 'Dr. Meera Patel (City Admin)', 'Municipal HQ')}
               >
                 <div className="auth-demo-badge admin">Admin</div>
-                <span className="auth-demo-text">City Operations & AI Control Centre</span>
+                <span className="auth-demo-text">City Admin (admin / admin123)</span>
               </button>
             </div>
           </div>

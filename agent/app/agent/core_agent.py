@@ -184,6 +184,15 @@ class ManagerAgent:
             "issue_confidence": issue_data.get("confidence", 0.9),
             "routing_confidence": routing_data.get("confidence", 0.9),
             "grounding_score": state.get("evidence", {}).get("grounding_score", 1.0),
+            "agent_thoughts": {
+                "issue": issue_data,
+                "evidence": state.get("evidence", {}),
+                "severity": severity_data,
+                "routing": routing_data,
+                "incident": incident_data,
+                "workflow": workflow_data,
+                "verification": verification_result,
+            },
         }
 
         try:

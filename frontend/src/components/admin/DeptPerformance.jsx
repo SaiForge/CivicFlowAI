@@ -1,7 +1,10 @@
 import React from 'react';
-import { deptPerformance } from '../../data/mockData';
+import { useDeptPerformance } from '../../hooks/useApi';
+import { Loader2 } from 'lucide-react';
 
 const DeptPerformance = () => {
+  const { data, loading } = useDeptPerformance();
+  const deptPerformance = data || [];
   return (
     <div className="card civic-section-card">
       <div className="card-header" style={{ marginBottom: '1rem' }}>
