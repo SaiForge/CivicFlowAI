@@ -66,8 +66,8 @@ class LLMClient:
         )
         self.openrouter_model = (
             openrouter_model
-            or getattr(settings, "OPENROUTER_MODEL_NAME", "openai/gpt-4o-mini")
-            or os.getenv("OPENROUTER_MODEL_NAME", "openai/gpt-4o-mini")
+            or getattr(settings, "OPENROUTER_MODEL_NAME", "thinkingmachines/inkling-small:free")
+            or os.getenv("OPENROUTER_MODEL_NAME", "thinkingmachines/inkling-small:free")
         )
         self.openrouter_base_url = (
             openrouter_base_url
@@ -385,7 +385,7 @@ class LLMClient:
             messages.append({"role": "user", "content": user_prompt})
 
         payload = {
-            "model": self.openrouter_model or "openai/gpt-4o-mini",
+            "model": self.openrouter_model or "thinkingmachines/inkling-small:free",
             "messages": messages,
             "temperature": temperature,
             "response_format": {"type": "json_object"},

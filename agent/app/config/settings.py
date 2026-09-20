@@ -30,7 +30,7 @@ try:
         GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
 
         OPENROUTER_API_KEY: str = ""
-        OPENROUTER_MODEL_NAME: str = "openai/gpt-4o-mini"
+        OPENROUTER_MODEL_NAME: str = "thinkingmachines/inkling-small:free"
         OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
         AGENT_DELAY_SECONDS: float = 5.0
@@ -52,7 +52,7 @@ except ImportError:
             GOOGLE_API_KEY: str = ""
             GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
             OPENROUTER_API_KEY: str = ""
-            OPENROUTER_MODEL_NAME: str = "openai/gpt-4o-mini"
+            OPENROUTER_MODEL_NAME: str = "thinkingmachines/inkling-small:free"
             OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
             AGENT_DELAY_SECONDS: float = 5.0
             MAX_RETRIES: int = 2
@@ -74,7 +74,7 @@ except ImportError:
                 self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
                 self.GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
                 self.OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-                self.OPENROUTER_MODEL_NAME = os.getenv("OPENROUTER_MODEL_NAME", "openai/gpt-4o-mini")
+                self.OPENROUTER_MODEL_NAME = os.getenv("OPENROUTER_MODEL_NAME", "thinkingmachines/inkling-small:free")
                 self.OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
                 self.AGENT_DELAY_SECONDS = float(os.getenv("AGENT_DELAY_SECONDS", "5.0"))
                 self.MAX_RETRIES = int(os.getenv("MAX_RETRIES", "2"))

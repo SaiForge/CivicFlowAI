@@ -90,7 +90,7 @@ variable "openrouter_api_key" {
 }
 
 variable "openrouter_model_name" {
-  description = "Model identifier for OpenRouter (e.g., openai/gpt-4o-mini)"
+  description = "Model identifier for OpenRouter (e.g., thinkingmachines/inkling-small:free)"
   type        = string
-  default     = "openai/gpt-4o-mini"
+  default     = "thinkingmachines/inkling-small:free"
 }
