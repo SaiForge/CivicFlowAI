@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { complaints, DEPARTMENTS } from '../../data/mockData';
+import { DEPARTMENTS } from '../../data/mockData';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge, PriorityBadge } from '../shared/StatusBadge';
 
 const ComplaintTable = ({ dept }) => {
-  const { openDetail } = useApp();
+  const { openDetail, complaintsList } = useApp();
   const [filterStatus, setFilterStatus] = useState('All');
 
-  const deptComplaints = complaints.filter(c => c.dept === dept);
+  const deptComplaints = (complaintsList || []).filter(c => c.dept === dept);
   const filtered = filterStatus === 'All' ? deptComplaints : deptComplaints.filter(c => c.status === filterStatus);
   const statuses = ['All', ...new Set(deptComplaints.map(c => c.status))];
 

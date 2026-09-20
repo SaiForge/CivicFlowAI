@@ -1,33 +1,77 @@
 import React, { useState } from 'react';
-import { mapMarkers, CATEGORY, PRIORITY } from '../../data/mockData';
+import { mapMarkers, CATEGORY } from '../../data/mockData';
+import { OFFLINE_WARD_REGISTRY } from '../../services/agentApi';
+import { MapPin, Layers, Building2, CheckCircle2 } from 'lucide-react';
 
 const catColors = {
-  Road:           '#1a1a1a',
-  Waste:          '#6b7280',
-  Water:          '#3b82f6',
-  Drainage:       '#8b5cf6',
-  Streetlight:    '#f59e0b',
-  Infrastructure: '#10b981',
-  Other:          '#9ca3af',
+  Road:           '#b45309',
+  Waste:          '#047857',
+  Water:          '#1d4ed8',
+  Drainage:       '#0891b2',
+  Streetlight:    '#d97706',
+  Infrastructure: '#7c3aed',
+  Other:          '#6b7280',
 };
 
 const prioritySize = { Critical: 18, High: 14, Medium: 12, Low: 10 };
 
 const HotspotMap = ({ filterDept = null }) => {
   const [activeCategory, setActiveCategory] = useState(null);
+  const [selectedWard, setSelectedWard] = useState(null);
   const [hoveredMarker, setHoveredMarker] = useState(null);
 
   const categories = Object.values(CATEGORY);
-  const filtered = mapMarkers.filter(m =>
-    (!activeCategory || m.category === activeCategory)
-  );
+  const wards = Object.values(OFFLINE_WARD_REGISTRY);
+
+  const filtered = mapMarkers.filter(m => {
+    const matchesCat = !activeCategory || m.category === activeCategory;
+    const matchesWard = !selectedWard || m.label?.toLowerCase().includes(selectedWard.toLowerCase());
+    return matchesCat && matchesWard;
+  });
 
   return (
     <div className="card civic-section-card">
-      <div className="card-header" style={{ marginBottom: '1rem' }}>
+      <div className="card-header" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
         <div>
-          <h4 className="card-title">Civic Hotspot Map</h4>
-          <span className="card-sub">Issue concentration by area</span>
+          <div className="indian-civic-badge" style={{ marginBottom: '0.25rem' }}>
+            <span className="tricolor-marker" />
+            <span>वार्ड नागरिक मानचित्र · Municipal Ward Geospatial Registry</span>
+          </div>
+          <h4 className="card-title">Ward Incident & Cluster Hotspot Map</h4>
+          <span className="card-sub">Real-time incident concentration and duplicate clusters across municipal wards</span>
+        </div>
+
+        {selectedWard && (
+          <button 
+            className="civic-btn civic-btn-xs civic-btn-ghost"
+            onClick={() => setSelectedWard(null)}
+          >
+            Clear Ward Filter
+          </button>
+        )}
+      </div>
+
+      {/* Ward Quick Filter Pills */}
+      <div style={{ marginBottom: '0.85rem' }}>
+        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: '0.35rem' }}>
+          Municipal Wards (वार्ड चयन):
+        </span>
+        <div className="filter-tabs" style={{ gap: '0.4rem' }}>
+          <button
+            className={`filter-tab ${!selectedWard ? 'filter-tab-active' : ''}`}
+            onClick={() => setSelectedWard(null)}
+          >
+            All Wards (सभी वार्ड)
+          </button>
+          {wards.map(w => (
+            <button
+              key={w.ward}
+              className={`filter-tab ${selectedWard === w.ward ? 'filter-tab-active' : ''}`}
+              onClick={() => setSelectedWard(selectedWard === w.ward ? null : w.ward)}
+            >
+              Ward {w.ward_number} · {w.ward}
+            </button>
+          ))}
         </div>
       </div>
 
@@ -36,7 +80,9 @@ const HotspotMap = ({ filterDept = null }) => {
         <button
           className={`map-filter-btn ${!activeCategory ? 'map-filter-active' : ''}`}
           onClick={() => setActiveCategory(null)}
-        >All</button>
+        >
+          All Domains
+        </button>
         {categories.map(cat => (
           <button
             key={cat}
@@ -64,15 +110,19 @@ const HotspotMap = ({ filterDept = null }) => {
           <line x1="0" y1="40" x2="100" y2="40" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
           <line x1="50" y1="0" x2="50" y2="80" stroke="rgba(0,0,0,0.12)" strokeWidth="1"/>
           <line x1="0" y1="20" x2="100" y2="60" stroke="rgba(0,0,0,0.07)" strokeWidth="0.75"/>
-          {/* Area labels */}
+          
+          {/* Municipal Zone labels */}
           {[
-            { x: 10, y: 12, label: 'North Zone' },
-            { x: 72, y: 12, label: 'East Zone' },
-            { x: 10, y: 72, label: 'South Zone' },
-            { x: 72, y: 72, label: 'West Zone' },
+            { x: 10, y: 12, label: 'North Zone · Malleshwaram' },
+            { x: 62, y: 12, label: 'East Zone · Indiranagar' },
+            { x: 10, y: 72, label: 'South Zone · Koramangala / HSR' },
+            { x: 62, y: 72, label: 'Mahadevapura · Bellandur' },
           ].map(z => (
-            <text key={z.label} x={z.x} y={z.y} fontSize="3.5" fill="rgba(0,0,0,0.25)" fontFamily="Inter,sans-serif">{z.label}</text>
+            <text key={z.label} x={z.x} y={z.y} fontSize="3" fill="rgba(0,0,0,0.35)" fontWeight="600" fontFamily="Inter,sans-serif">
+              {z.label}
+            </text>
           ))}
+
           {/* Markers */}
           {filtered.map(m => {
             const sz = prioritySize[m.priority] || 12;
@@ -96,11 +146,15 @@ const HotspotMap = ({ filterDept = null }) => {
                   </text>
                 )}
                 {isHovered && (
-                  <foreignObject x={m.x + 4} y={m.y - 12} width="40" height="16">
+                  <foreignObject x={Math.min(60, m.x + 4)} y={Math.max(4, m.y - 14)} width="44" height="20">
                     <div xmlns="http://www.w3.org/1999/xhtml" style={{
-                      background: '#1a1a1a', color: '#fff', borderRadius: '4px',
-                      padding: '2px 5px', fontSize: '8px', whiteSpace: 'nowrap', lineHeight: 1.4,
-                    }}>{m.label}</div>
+                      background: '#1a1a1a', color: '#fff', borderRadius: '6px',
+                      padding: '4px 6px', fontSize: '7.5px', whiteSpace: 'nowrap', lineHeight: 1.4,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.25)'
+                    }}>
+                      <div style={{ fontWeight: 700 }}>{m.label}</div>
+                      <div style={{ color: '#fbbf24', fontSize: '6.5px' }}>{m.category} · {m.priority}</div>
+                    </div>
                   </foreignObject>
                 )}
               </g>

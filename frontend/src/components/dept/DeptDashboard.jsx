@@ -4,7 +4,8 @@ import StatCard from '../shared/StatCard';
 import PriorityQueue from './PriorityQueue';
 import ComplaintTable from './ComplaintTable';
 import HotspotMap from '../admin/HotspotMap';
-import { complaints, DEPARTMENTS, STATUS } from '../../data/mockData';
+import AgentConsole from '../admin/AgentConsole';
+import { DEPARTMENTS, STATUS } from '../../data/mockData';
 import {
   FilePlus2, ClipboardCheck, Timer, Hourglass, CheckCircle2, AlertTriangle,
   Building2, ShieldCheck, Flame, Clock
@@ -19,13 +20,14 @@ const deptHindiMap = {
   infra: 'सार्वजनिक नागरिक संरचना प्रकोष्ठ',
 };
 
-const SECTIONS = ['Priority Queue', 'Department Complaints', 'Ward Heatmap'];
+const SECTIONS = ['Priority Queue', 'Department Complaints', 'Ward Heatmap', 'AI Agents (7 विशेषज्ञ)'];
 
 const DeptDashboard = () => {
-  const { activeDept, setActiveDept } = useApp();
+  const { activeDept, setActiveDept, complaintsList } = useApp();
   const [activeSection, setActiveSection] = useState('Priority Queue');
   const deptInfo = DEPARTMENTS[activeDept] || DEPARTMENTS.road;
-  const deptComplaints = complaints.filter(c => c.dept === activeDept);
+  const currentComplaints = complaintsList || [];
+  const deptComplaints = currentComplaints.filter(c => c.dept === activeDept);
 
   const count = (status) => deptComplaints.filter(c => c.status === status).length;
   const newCount  = deptComplaints.filter(c => c.status === STATUS.SUBMITTED).length;
@@ -118,9 +120,10 @@ const DeptDashboard = () => {
       </div>
 
       {/* ── Tab Views ── */}
-      {activeSection === 'Priority Queue'       && <PriorityQueue dept={activeDept} />}
+      {activeSection === 'Priority Queue'        && <PriorityQueue dept={activeDept} />}
       {activeSection === 'Department Complaints' && <ComplaintTable dept={activeDept} />}
-      {activeSection === 'Ward Heatmap'         && <HotspotMap filterDept={activeDept} />}
+      {activeSection === 'Ward Heatmap'          && <HotspotMap filterDept={activeDept} />}
+      {activeSection === 'AI Agents (7 विशेषज्ञ)' && <AgentConsole />}
     </div>
   );
 };

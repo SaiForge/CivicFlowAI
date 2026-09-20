@@ -86,9 +86,12 @@ const ComplaintProgress = ({ complaint }) => {
 };
 
 const CitizenDashboard = () => {
-  const { setReportFormOpen } = useApp();
+  const { setReportFormOpen, complaintsList } = useApp();
   const [activeSection, setActiveSection] = useState('My Complaints');
   const unreadCount = citizenNotifications.filter(n => !n.read).length;
+
+  const currentComplaints = complaintsList || [];
+  const myComplaints = currentComplaints.filter(c => c.citizenId === 'C-001' || c.citizenId?.includes('CITIZEN') || c.id?.startsWith('TICK-'));
 
   return (
     <div className="civic-page">
@@ -180,7 +183,7 @@ const CitizenDashboard = () => {
               {s}
               {s === 'My Complaints' && (
                 <span className="tab-badge" style={{ background: 'var(--dark-card)', color: '#fff' }}>
-                  {citizenMyComplaints.length}
+                  {myComplaints.length}
                 </span>
               )}
               {s === 'Municipal Alerts' && unreadCount > 0 && (
@@ -199,12 +202,12 @@ const CitizenDashboard = () => {
               <h4 className="card-title">My Registered Complaints</h4>
               <span className="card-sub">Track real-time progress from submission to photographic proof of work</span>
             </div>
-            <span className="badge badge-dark">{citizenMyComplaints.length} Active</span>
+            <span className="badge badge-dark">{myComplaints.length} Active</span>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            {citizenMyComplaints.map(c => <ComplaintProgress key={c.id} complaint={c} />)}
-            {!citizenMyComplaints.length && (
+            {myComplaints.map(c => <ComplaintProgress key={c.id} complaint={c} />)}
+            {!myComplaints.length && (
               <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '2.5rem' }}>
                 You have not filed any grievances yet. Click above to file your first complaint.
               </div>

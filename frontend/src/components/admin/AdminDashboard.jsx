@@ -4,6 +4,7 @@ import IssueBreakdown from './IssueBreakdown';
 import ActivityFeed from './ActivityFeed';
 import HotspotMap from './HotspotMap';
 import DeptPerformance from './DeptPerformance';
+import AgentConsole from './AgentConsole';
 import { adminStats, statusBreakdown, incidents } from '../../data/mockData';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -16,6 +17,7 @@ import {
 const totalStatusCount = statusBreakdown.reduce((a, b) => a + b.count, 0);
 const SECTIONS = [
   { id: 'Overview', label: 'Overview', hindi: 'सिंहावलोकन' },
+  { id: 'Agents', label: 'AI Agent Console', hindi: 'मल्टी-एजेंट नियंत्रण' },
   { id: 'Status', label: 'Status Matrix', hindi: 'स्थिति विवरण' },
   { id: 'Hotspot Map', label: 'Ward Hotspots', hindi: 'वार्ड मानचित्र' },
   { id: 'Departments', label: 'Dept Operations', hindi: 'विभागीय दक्षता' },
@@ -48,7 +50,12 @@ const AdminDashboard = () => {
       </div>
 
       {/* ── Autonomous AI Triaging Engine Status Banner ── */}
-      <div className="card admin-ai-engine-banner">
+      <div 
+        className="card admin-ai-engine-banner"
+        onClick={() => setActiveSection('Agents')}
+        style={{ cursor: 'pointer' }}
+        title="Click to open AI Multi-Agent Console"
+      >
         <div className="admin-ai-banner-inner">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem' }}>
             <div className="admin-ai-badge-icon">
@@ -116,6 +123,8 @@ const AdminDashboard = () => {
           <ActivityFeed />
         </div>
       )}
+
+      {activeSection === 'Agents' && <AgentConsole />}
 
       {activeSection === 'Status' && (
         <div className="card civic-section-card">
