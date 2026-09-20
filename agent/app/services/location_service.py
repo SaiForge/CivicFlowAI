@@ -204,10 +204,12 @@ class LocationService:
                     "ward": ward_info["ward"],
                     "ward_number": ward_info["ward_number"],
                     "zone": ward_info["zone"],
+                    "office": ward_info["office"],
                     "jurisdiction_office": ward_info["office"],
                     "approx_center": ward_info["approx_center"],
                 }
         return None
+
 
     def _parse_nominatim_reverse(self, data: Dict[str, Any], lat: float, lng: float) -> Dict[str, Any]:
         """Parses OpenStreetMap Nominatim reverse geocode JSON response."""
