@@ -1,5 +1,4 @@
-import React, { useState } from 'react';
-import { categoryBreakdown } from '../../data/mockData';
+import { useApp } from '../../context/AppContext';
 import { 
   Car, Trash2, Droplets, Waves, Lightbulb, 
   Building2, Layers, ArrowUpRight
@@ -16,8 +15,9 @@ const categoryMeta = {
 };
 
 const IssueBreakdown = () => {
+  const { categoryBreakdown } = useApp();
   const [metricView, setMetricView] = useState('volume'); // 'volume' | 'resolution'
-  const totalComplaints = categoryBreakdown.reduce((sum, c) => sum + c.count, 0);
+  const totalComplaints = categoryBreakdown.reduce((sum, c) => sum + c.count, 0) || 1;
 
   return (
     <div className="card civic-section-card breakdown-card">

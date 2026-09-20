@@ -1,7 +1,8 @@
 import React from 'react';
-import { deptPerformance } from '../../data/mockData';
+import { useApp } from '../../context/AppContext';
 
 const DeptPerformance = () => {
+  const { deptPerformance } = useApp();
   return (
     <div className="card civic-section-card">
       <div className="card-header" style={{ marginBottom: '1rem' }}>

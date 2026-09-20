@@ -7,41 +7,24 @@ import HomePage from './components/home/HomePage';
 import OnboardingTourModal from './components/home/OnboardingTourModal';
 import AuthModal from './components/home/AuthModal';
 
-// Role dashboards
+// Role dashboards: Unified Admin & Authority Dashboard, and Citizen Dashboard
 import AdminDashboard from './components/admin/AdminDashboard';
-import DeptDashboard from './components/dept/DeptDashboard';
 import CitizenDashboard from './components/citizen/CitizenDashboard';
 
-// Page router per role
+// Streamlined page router
 const pageComponents = {
   admin: {
-    overview:    () => <AdminDashboard />,
-    complaints:  () => <AdminDashboard />,
-    incidents:   () => <AdminDashboard />,
-    departments: () => <AdminDashboard />,
-    map:         () => <AdminDashboard />,
-    analytics:   () => <AdminDashboard />,
-    agents:      () => <AdminDashboard />,
-    escalations: () => <AdminDashboard />,
-    settings:    () => <AdminDashboard />,
-  },
-  dept: {
-    overview:    () => <DeptDashboard />,
-    queue:       () => <DeptDashboard />,
-    complaints:  () => <DeptDashboard />,
-    incidents:   () => <DeptDashboard />,
-    map:         () => <DeptDashboard />,
-    resolution:  () => <DeptDashboard />,
-    escalations: () => <DeptDashboard />,
-    analytics:   () => <DeptDashboard />,
+    overview:   () => <AdminDashboard />,
+    queue:      () => <AdminDashboard />,
+    agents:     () => <AdminDashboard />,
+    map:        () => <AdminDashboard />,
+    complaints: () => <AdminDashboard />,
   },
   citizen: {
-    overview:    () => <CitizenDashboard />,
-    myissues:    () => <CitizenDashboard />,
-    nearby:      () => <CitizenDashboard />,
-    map:         () => <CitizenDashboard />,
-    notifs:      () => <CitizenDashboard />,
-    profile:     () => <CitizenDashboard />,
+    overview: () => <CitizenDashboard />,
+    myissues: () => <CitizenDashboard />,
+    nearby:   () => <CitizenDashboard />,
+    report:   () => <CitizenDashboard />,
   },
 };
 
@@ -49,9 +32,10 @@ const AppContent = () => {
   const { role, activePage, reportFormOpen } = useApp();
 
   const isHome = activePage === 'home';
+  const roleKey = role === 'admin' || role === 'dept' ? 'admin' : 'citizen';
 
-  const PageComponent = (pageComponents[role] || pageComponents.citizen)[activePage]
-    || pageComponents[role]?.overview
+  const PageComponent = pageComponents[roleKey][activePage]
+    || pageComponents[roleKey].overview
     || (() => null);
 
   return (
@@ -67,7 +51,7 @@ const AppContent = () => {
           {/* Background Indian Jali Architectural Lattice Pattern */}
           <div className="indian-jali-backdrop" aria-hidden="true" />
 
-          {/* Header with nav pills — the only navigation */}
+          {/* Header with clean navigation pills — the only navigation */}
           <Header />
 
           {/* Full-width content area, no sidebar */}

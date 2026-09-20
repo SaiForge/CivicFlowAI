@@ -5,7 +5,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_AGENT_API_URL || '';
-const DIRECT_BACKEND = 'http://127.0.0.1:8000';
+const DIRECT_BACKEND = 'http://127.0.0.1:5000';
 
 // Fallback Municipal Ward Registry for offline resilience
 export const OFFLINE_WARD_REGISTRY = {

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { activityFeed } from '../../data/mockData';
 import { useApp } from '../../context/AppContext';
 import { 
   AlertTriangle, UserCheck, ThumbsUp, Camera, 
@@ -16,7 +15,7 @@ const eventTypeMeta = {
 };
 
 const ActivityFeed = () => {
-  const { openDetail } = useApp();
+  const { openDetail, activityFeed } = useApp();
   const [filter, setFilter] = useState('all'); // 'all' | 'urgent' | 'resolved'
 
   const filteredItems = activityFeed.filter((item) => {
