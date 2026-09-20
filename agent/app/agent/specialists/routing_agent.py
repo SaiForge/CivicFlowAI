@@ -47,6 +47,16 @@ class RoutingAgent:
 
                 if lat is not None and lng is not None:
                     resolved_location = await self.geocode_tool.arun(lat=lat, lng=lng)
+                elif hasattr(self.geocode_tool, "forward_geocode"):
+                    text_query = (
+                        (location_input.get("raw_text_address") if isinstance(location_input, dict) else getattr(location_input, "raw_text_address", None))
+                        or complaint_text
+                    )
+                    if text_query:
+                        resolved_location = await self.geocode_tool.forward_geocode(text_query)
+            elif complaint_text and hasattr(self.geocode_tool, "forward_geocode"):
+                resolved_location = await self.geocode_tool.forward_geocode(complaint_text)
+
 
             prompt_parts = []
             if feedback:
