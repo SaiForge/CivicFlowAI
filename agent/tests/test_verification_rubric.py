@@ -8,7 +8,7 @@ sys.path.insert(0, str(BASE_DIR))
 from app.agent.specialists.verification_agent import VerificationAgent
 from app.llm.openai_client import LLMClient
 
-async def test_verification():
+def test_verification():
     llm = LLMClient()
     verifier = VerificationAgent(llm_client=llm, confidence_threshold=0.7)
 
@@ -68,4 +68,4 @@ async def test_verification():
     print("\nSUCCESS: All verification programmatic checks passed as expected!")
 
 if __name__ == "__main__":
-    asyncio.run(test_verification())
+    test_verification()

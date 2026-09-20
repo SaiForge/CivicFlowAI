@@ -36,7 +36,7 @@ jobs:
       - name: Run Multi-Agent Quality Gate Tests
         run: |
           cd agent
-          pytest tests/test_verification_rubric.py -v
+          pytest tests/test_verification_rubric.py -v -o asyncio_mode=auto
 
       - name: Set up Node.js 20.x
         uses: actions/setup-node@v4
