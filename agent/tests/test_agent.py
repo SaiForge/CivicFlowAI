@@ -254,6 +254,8 @@ async def test_pipeline_max_retries_exhausted():
         assert stored is not None
         assert stored["status"] == "needs_manual_review"
 
+
+
 @pytest.mark.asyncio
 async def test_gemini_client_configuration_and_mock_call():
     """Test Gemini provider initialization and execution with mocked httpx."""

@@ -20,6 +20,8 @@ from app.agent.specialists import (
     VerificationAgent,
 )
 from app.api.routes import router as complaints_router
+from app.api.location_routes import router as location_router
+
 
 # Configure logging
 logging.basicConfig(
@@ -95,6 +97,8 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(complaints_router)
+app.include_router(location_router)
+
 
 @app.get("/", tags=["Health"])
 async def root():

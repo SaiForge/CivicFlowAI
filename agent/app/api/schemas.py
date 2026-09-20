@@ -107,3 +107,42 @@ class TicketOutput(BaseModel):
     issue_confidence: Optional[float] = None
     routing_confidence: Optional[float] = None
     grounding_score: Optional[float] = None
+
+class GeocodeRequest(BaseModel):
+    query: str = Field(..., description="Address, area, or landmark string")
+
+class GeocodeResponse(BaseModel):
+    lat: float
+    lng: float
+    formatted_address: str
+    ward: str
+    ward_number: int
+    zone: str
+    jurisdiction_office: str
+
+class ReverseGeocodeRequest(BaseModel):
+    lat: float
+    lng: float
+
+class ReverseGeocodeResponse(BaseModel):
+    lat: float
+    lng: float
+    area: str
+    ward: str
+    ward_number: int
+    zone: str
+    city: str
+    jurisdiction_office: str
+    formatted_address: str
+
+class ProximityCheckRequest(BaseModel):
+    lat: float
+    lng: float
+    radius_meters: float = Field(200.0, description="Search radius in meters")
+
+class ProximityCheckResponse(BaseModel):
+    center: Dict[str, float]
+    radius_meters: float
+    count: int
+    nearby_complaints: List[Dict[str, Any]]
+

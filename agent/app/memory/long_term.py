@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 import threading
 
+from contextlib import contextmanager
+
 logger = logging.getLogger(__name__)
 
 class LongTermMemory:
@@ -31,10 +33,15 @@ class LongTermMemory:
         self._lock = threading.Lock()
         self.init_db()
 
-    def _get_connection(self) -> sqlite3.Connection:
+    @contextmanager
+    def _get_connection(self):
         conn = sqlite3.connect(self.db_file, check_same_thread=False)
         conn.row_factory = sqlite3.Row
-        return conn
+        try:
+            yield conn
+        finally:
+            conn.close()
+
 
     def init_db(self) -> None:
         """Create database tables if they do not exist."""

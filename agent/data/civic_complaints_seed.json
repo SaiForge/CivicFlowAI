@@ -1,0 +1,602 @@
+[
+  {
+    "id": "SEED-001",
+    "complaint_text": "Massive crater-like pothole near the Indiranagar 100 Feet Road junction right in front of the metro station pillar 42. Two two-wheelers skidded last evening in the rain, extremely hazardous at night.",
+    "location": {
+      "lat": 12.9783,
+      "lng": 77.6408,
+      "raw_text_address": "Indiranagar 100ft Road, near Metro Pillar 42, Bengaluru",
+      "ward": "Indiranagar",
+      "ward_number": 112,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Wide, deep waterlogged asphalt pothole spanning 1.5 meters across vehicular traffic lane."
+    },
+    "expected": {
+      "issue_type": "pothole",
+      "severity": "Critical",
+      "primary_department": "Roads & Infrastructure Department",
+      "is_duplicate_cluster": true,
+      "cluster_id": "CLUSTER-INDIRANAGAR-POTHOLE"
+    }
+  },
+  {
+    "id": "SEED-002",
+    "complaint_text": "There is a deep road cavity near metro pillar 42 on Indiranagar 100ft road. Bikes are almost falling every ten minutes.",
+    "location": {
+      "lat": 12.9784,
+      "lng": 77.6409,
+      "raw_text_address": "Opposite Metro Pillar 42, 100 Feet Road, Indiranagar, Bengaluru",
+      "ward": "Indiranagar",
+      "ward_number": 112,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "pothole",
+      "severity": "High",
+      "primary_department": "Roads & Infrastructure Department",
+      "is_duplicate_cluster": true,
+      "cluster_id": "CLUSTER-INDIRANAGAR-POTHOLE"
+    }
+  },
+  {
+    "id": "SEED-003",
+    "complaint_text": "Huge pile of domestic garbage and rotten vegetable waste dumped on the corner of 5th Main Koramangala 4th Block. The municipal bins have not been emptied for five days. Stray dogs and cows are scattering waste onto the street.",
+    "location": {
+      "lat": 12.9345,
+      "lng": 77.6265,
+      "raw_text_address": "Corner of 5th Main & 12th Cross, Koramangala 4th Block, Bengaluru",
+      "ward": "Koramangala",
+      "ward_number": 151,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Overflowing green municipal dumpster with substantial decomposing waste spillover blocking half the street."
+    },
+    "expected": {
+      "issue_type": "garbage_accumulation",
+      "severity": "High",
+      "primary_department": "Sanitation Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-004",
+    "complaint_text": "Streetlights along the entire stretch of 80 Feet Road in Koramangala near Maharaja Signal are completely dark for the past 4 nights. Female commuters feel very unsafe walking home from the bus depot.",
+    "location": {
+      "lat": 12.9392,
+      "lng": 77.6294,
+      "raw_text_address": "80 Feet Road, near Maharaja Signal, Koramangala, Bengaluru",
+      "ward": "Koramangala",
+      "ward_number": 151,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "streetlight_damage",
+      "severity": "High",
+      "primary_department": "Electrical Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-005",
+    "complaint_text": "Major underground potable water supply pipeline burst right opposite National Public School in HSR Layout Sector 2. Thousands of liters of clean drinking water gushing onto the road causing localized flooding.",
+    "location": {
+      "lat": 12.9121,
+      "lng": 77.6445,
+      "raw_text_address": "Opposite NPS, 14th Main, HSR Layout Sector 2, Bengaluru",
+      "ward": "HSR Layout",
+      "ward_number": 174,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Pressurized water geyser erupting 1 meter high from cracked municipal water main into pedestrian walkway."
+    },
+    "expected": {
+      "issue_type": "water_leakage",
+      "severity": "Critical",
+      "primary_department": "Water Board",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-006",
+    "complaint_text": "Stormwater drain choked with plastic bottles and construction debris behind the Bellandur lake eco-park boundary. Water is starting to back up towards neighboring apartments.",
+    "location": {
+      "lat": 12.9284,
+      "lng": 77.6742,
+      "raw_text_address": "Behind Lake Eco Park boundary, Bellandur, Bengaluru",
+      "ward": "Bellandur",
+      "ward_number": 150,
+      "zone": "Mahadevapura Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Open stormwater canal clogged with dense silt, concrete sacks, and unsegregated plastic refuse."
+    },
+    "expected": {
+      "issue_type": "drainage_blockage",
+      "severity": "High",
+      "primary_department": "Water Board",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-007",
+    "complaint_text": "Manhole cover is cracked and dark sewage is overflowing onto 27th Main in BTM Layout Stage 2. Terrible stench and pedestrians are forced to walk into heavy traffic.",
+    "location": {
+      "lat": 12.9165,
+      "lng": 77.6101,
+      "raw_text_address": "27th Main, BTM 2nd Stage, near Udupi Garden signal, Bengaluru",
+      "ward": "BTM Layout",
+      "ward_number": 176,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Severely displaced circular manhole cover leaking foul sewage sludge onto vehicular road surface."
+    },
+    "expected": {
+      "issue_type": "sewage_overflow",
+      "severity": "Critical",
+      "primary_department": "Sanitation Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-008",
+    "complaint_text": "Large gulmohar tree uprooted after heavy storm last night on CMH Road near Chinmaya Mission Hospital. The tree has completely blocked both traffic lanes and brought down power lines.",
+    "location": {
+      "lat": 12.9781,
+      "lng": 77.6385,
+      "raw_text_address": "CMH Road, opposite Chinmaya Hospital, Indiranagar, Bengaluru",
+      "ward": "Indiranagar",
+      "ward_number": 112,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Mature fallen tree across four-lane road with snapped overhead electrical cables."
+    },
+    "expected": {
+      "issue_type": "tree_fallen",
+      "severity": "Critical",
+      "primary_department": "Parks & Horticulture Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-009",
+    "complaint_text": "A pack of 6-7 aggressive stray dogs has been terrorizing residents near the public playground in Jayanagar 4th Block. Two school children were chased this morning.",
+    "location": {
+      "lat": 12.9298,
+      "lng": 77.5833,
+      "raw_text_address": "9th Main, Jayanagar 4th Block, near Public Playground, Bengaluru",
+      "ward": "Jayanagar",
+      "ward_number": 153,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "stray_animal",
+      "severity": "High",
+      "primary_department": "Animal Control Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-010",
+    "complaint_text": "Unauthorized commercial shed being constructed encroaching upon public pavement outside Malleshwaram 8th Cross market. Footpath pedestrians have no space to walk.",
+    "location": {
+      "lat": 12.9984,
+      "lng": 77.5714,
+      "raw_text_address": "8th Cross, Sampige Road, Malleshwaram, Bengaluru",
+      "ward": "Malleshwaram",
+      "ward_number": 65,
+      "zone": "West Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Metal scaffolding and tin roof structure erected on concrete public sidewalk."
+    },
+    "expected": {
+      "issue_type": "illegal_construction",
+      "severity": "Medium",
+      "primary_department": "Municipal Planning Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-011",
+    "complaint_text": "Cobblestone and tiles on pedestrian walkway near MG Road Trinity circle are completely broken and dislodged. Elderly citizens frequently trip.",
+    "location": {
+      "lat": 12.9726,
+      "lng": 77.6186,
+      "raw_text_address": "MG Road near Trinity Metro Station, Bengaluru",
+      "ward": "Shantala Nagar",
+      "ward_number": 111,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Cracked, loose interlocking concrete pavers with exposed earth and sharp tile fragments."
+    },
+    "expected": {
+      "issue_type": "road_damage",
+      "severity": "Medium",
+      "primary_department": "Roads & Infrastructure Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-012",
+    "complaint_text": "Broken public bench and damaged playground swing set at the local BBMP park in Domlur 2nd Stage. Exposed metal bolts could hurt playing toddlers.",
+    "location": {
+      "lat": 12.9609,
+      "lng": 77.6387,
+      "raw_text_address": "Domlur 2nd Stage Park, 1st Cross, Bengaluru",
+      "ward": "Domlur",
+      "ward_number": 112,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Rusty children's swing frame with disconnected chain and jagged metal edges."
+    },
+    "expected": {
+      "issue_type": "other",
+      "severity": "Low",
+      "primary_department": "General Municipal Office",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-013",
+    "complaint_text": "Small pothole starting to develop on residential lane in Whitefield ECC Road. Needs quick asphalt patch before rains worsen it.",
+    "location": {
+      "lat": 12.9698,
+      "lng": 77.7499,
+      "raw_text_address": "ECC Road, near Deens Academy, Whitefield, Bengaluru",
+      "ward": "Whitefield",
+      "ward_number": 84,
+      "zone": "Mahadevapura Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "pothole",
+      "severity": "Low",
+      "primary_department": "Roads & Infrastructure Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-014",
+    "complaint_text": "Electric streetlight pole leaning precariously at 45 degree angle after truck collision on Outer Ring Road Marathahalli flyover descent. Live wires visible.",
+    "location": {
+      "lat": 12.9562,
+      "lng": 77.7011,
+      "raw_text_address": "Outer Ring Road, Marathahalli Bridge descent, Bengaluru",
+      "ward": "Marathahalli",
+      "ward_number": 85,
+      "zone": "Mahadevapura Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Damaged galvanized steel lamp post bent towards fast highway lane with exposed junction wires."
+    },
+    "expected": {
+      "issue_type": "streetlight_damage",
+      "severity": "Critical",
+      "primary_department": "Electrical Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-015",
+    "complaint_text": "Garbage pickup truck has not visited 3rd Cross, JP Nagar Phase 1 for over a week. Residents are leaving bags on street poles.",
+    "location": {
+      "lat": 12.9099,
+      "lng": 77.5884,
+      "raw_text_address": "3rd Cross, 14th Main, JP Nagar Phase 1, Bengaluru",
+      "ward": "JP Nagar",
+      "ward_number": 177,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "garbage_accumulation",
+      "severity": "Medium",
+      "primary_department": "Sanitation Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-016",
+    "complaint_text": "Constant drinking water seepage from roadside valve cover near Rajajinagar 1st Block bus terminal, wasting clean water throughout the afternoon.",
+    "location": {
+      "lat": 12.9912,
+      "lng": 77.5552,
+      "raw_text_address": "1st Block, near ESI Hospital Road, Rajajinagar, Bengaluru",
+      "ward": "Rajajinagar",
+      "ward_number": 99,
+      "zone": "West Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Water bubbling from round cast iron valve chamber forming shallow stream along gutter."
+    },
+    "expected": {
+      "issue_type": "water_leakage",
+      "severity": "Medium",
+      "primary_department": "Water Board",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-017",
+    "complaint_text": "Open gutter overflowing with murky rain runoff across the front entrance of Government Primary School in Shivajinagar. Children cannot enter without stepping in contaminated water.",
+    "location": {
+      "lat": 12.9863,
+      "lng": 77.6041,
+      "raw_text_address": "Dispensary Road, near Bus Depot, Shivajinagar, Bengaluru",
+      "ward": "Shivajinagar",
+      "ward_number": 92,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Flooded school gate with stagnant dark water and floating debris."
+    },
+    "expected": {
+      "issue_type": "drainage_blockage",
+      "severity": "Critical",
+      "primary_department": "Water Board",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-018",
+    "complaint_text": "Old dry eucalyptus tree branches cracked and hanging over the roadway on Palace Road near Mount Carmel College. Ready to snap at any moment.",
+    "location": {
+      "lat": 12.9904,
+      "lng": 77.5912,
+      "raw_text_address": "Palace Road, near MCC college gate, Vasanth Nagar, Bengaluru",
+      "ward": "Vasanth Nagar",
+      "ward_number": 93,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Massive broken tree branch dangling 4 meters above active vehicle lane."
+    },
+    "expected": {
+      "issue_type": "tree_fallen",
+      "severity": "High",
+      "primary_department": "Parks & Horticulture Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-019",
+    "complaint_text": "Wandering cow sitting in middle of busy underpass in Yeshwanthpur circle causing major traffic jam during evening rush hour.",
+    "location": {
+      "lat": 13.0232,
+      "lng": 77.5503,
+      "raw_text_address": "Yeshwanthpur Circle Underpass, Bengaluru",
+      "ward": "Yeshwanthpur",
+      "ward_number": 37,
+      "zone": "West Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "stray_animal",
+      "severity": "Medium",
+      "primary_department": "Animal Control Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-020",
+    "complaint_text": "A permanent concrete staircase has been constructed encroaching 4 feet onto the public asphalt road by a commercial complex on Gandhi Bazaar Main Road.",
+    "location": {
+      "lat": 12.9463,
+      "lng": 77.5711,
+      "raw_text_address": "Gandhi Bazaar Main Road, Basavanagudi, Bengaluru",
+      "ward": "Basavanagudi",
+      "ward_number": 154,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Newly poured concrete stairs protruding into road carriageway with yellow barrier tape."
+    },
+    "expected": {
+      "issue_type": "illegal_construction",
+      "severity": "Medium",
+      "primary_department": "Municipal Planning Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-021",
+    "complaint_text": "Severe sinkhole forming after underground cable digging was poorly backfilled on Sarjapur Road near Wipro gate. Depth is almost 2 feet.",
+    "location": {
+      "lat": 12.9114,
+      "lng": 77.6841,
+      "raw_text_address": "Sarjapur Main Road, opposite Wipro Corporate Gate, Bengaluru",
+      "ward": "Bellandur",
+      "ward_number": 150,
+      "zone": "Mahadevapura Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Collapsing road trench with sinking asphalt edges and loose gravel mound."
+    },
+    "expected": {
+      "issue_type": "road_damage",
+      "severity": "Critical",
+      "primary_department": "Roads & Infrastructure Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-022",
+    "complaint_text": "Raw sewage backflowing into the basement car park of residential society in Banashankari 3rd Stage due to main municipal trunk line blockage.",
+    "location": {
+      "lat": 12.9234,
+      "lng": 77.5467,
+      "raw_text_address": "100ft Ring Road, Banashankari 3rd Stage, Bengaluru",
+      "ward": "Banashankari",
+      "ward_number": 155,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Sewage water flooding concrete garage floor with significant sediment."
+    },
+    "expected": {
+      "issue_type": "sewage_overflow",
+      "severity": "Critical",
+      "primary_department": "Sanitation Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-023",
+    "complaint_text": "Streetlight timer in Kalyan Nagar HRBR layout 2nd block is misconfigured. Lamps remain on all day in the sun and switch off at sunset.",
+    "location": {
+      "lat": 13.0181,
+      "lng": 77.6489,
+      "raw_text_address": "5th Main, HRBR Layout 2nd Block, Kalyan Nagar, Bengaluru",
+      "ward": "Kacharakanahalli",
+      "ward_number": 29,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": false,
+      "image_description": null
+    },
+    "expected": {
+      "issue_type": "streetlight_damage",
+      "severity": "Low",
+      "primary_department": "Electrical Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-024",
+    "complaint_text": "Dumped construction debris and cement bags blocking the entrance to public walking track in Agara Lake park.",
+    "location": {
+      "lat": 12.9213,
+      "lng": 77.6521,
+      "raw_text_address": "Agara Lake South Gate entrance, HSR Outer Ring Road, Bengaluru",
+      "ward": "HSR Layout",
+      "ward_number": 174,
+      "zone": "South Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Piles of demolished masonry bricks and dry concrete mix dumped on public pathway."
+    },
+    "expected": {
+      "issue_type": "garbage_accumulation",
+      "severity": "Medium",
+      "primary_department": "Sanitation Department",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  },
+  {
+    "id": "SEED-025",
+    "complaint_text": "Broken municipal directional signboard at MG Road Brigade Road junction is hanging dangerously over passing pedestrians.",
+    "location": {
+      "lat": 12.9734,
+      "lng": 77.6074,
+      "raw_text_address": "Brigade Road junction with MG Road, Bengaluru",
+      "ward": "Shantala Nagar",
+      "ward_number": 111,
+      "zone": "East Zone",
+      "city": "Bengaluru"
+    },
+    "multimodal": {
+      "has_image": true,
+      "image_description": "Metal street sign detached on one bracket swinging in wind."
+    },
+    "expected": {
+      "issue_type": "other",
+      "severity": "Medium",
+      "primary_department": "General Municipal Office",
+      "is_duplicate_cluster": false,
+      "cluster_id": null
+    }
+  }
+]
