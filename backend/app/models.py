@@ -19,7 +19,7 @@ ROLES = ("citizen", "dept", "admin")
 STATUSES = (
     "Submitted", "Under Review", "Assigned", "In Progress",
     "Resolution Submitted", "Verification Pending", "Resolved",
-    "Closed", "Escalated",
+    "Closed", "Escalated", "Rejected",
 )
 PRIORITIES = ("Low", "Medium", "High", "Critical")
 CATEGORIES = ("Road", "Waste", "Streetlight", "Water", "Drainage", "Infrastructure", "Other")

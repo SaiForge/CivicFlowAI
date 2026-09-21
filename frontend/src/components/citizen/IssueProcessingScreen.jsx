@@ -38,7 +38,7 @@ const IssueProcessingScreen = () => {
   const apiDataRef = useRef(null);
   const apiErrorRef = useRef(null);
 
-  // 1. Listen to background API call
+  // 1. Listen to background API call — trigger live refresh as soon as API resolves
   useEffect(() => {
     if (!processingSubmission?.promise) return;
 
@@ -46,12 +46,15 @@ const IssueProcessingScreen = () => {
       .then((data) => {
         apiDataRef.current = data;
         setIsApiReady(true);
+        // Immediately update all role dashboards (citizen, admin, dept) when complaint is confirmed
+        if (triggerRefresh) triggerRefresh();
       })
       .catch((err) => {
         console.error('Submission background API rejection:', err);
         const msg = err?.message || 'Photographic evidence does not corroborate reported grievance.';
         apiErrorRef.current = msg;
       });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [processingSubmission]);
 
   // 2. High-precision ticker loop advancing stages realistically (~64s minimum)

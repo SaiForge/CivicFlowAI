@@ -13,6 +13,45 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import DeptDashboard from './components/dept/DeptDashboard';
 import CitizenDashboard from './components/citizen/CitizenDashboard';
 
+// ── Error Boundary — catches runtime crashes and renders a visible error ──
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    this.setState({ errorInfo });
+    console.error('[CivicFlow ErrorBoundary]', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '2rem', fontFamily: 'Inter, system-ui, sans-serif', maxWidth: 720, margin: '3rem auto' }}>
+          <h2 style={{ color: '#dc2626', marginBottom: '1rem' }}>Something went wrong</h2>
+          <pre style={{ background: '#fef2f2', color: '#991b1b', padding: '1rem', borderRadius: '0.5rem', fontSize: '0.8rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word', border: '1px solid #fecaca' }}>
+            {this.state.error?.toString()}
+          </pre>
+          {this.state.errorInfo && (
+            <details style={{ marginTop: '1rem' }}>
+              <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Component Stack</summary>
+              <pre style={{ background: '#f1f5f9', padding: '1rem', borderRadius: '0.5rem', fontSize: '0.72rem', whiteSpace: 'pre-wrap', marginTop: '0.5rem' }}>
+                {this.state.errorInfo.componentStack}
+              </pre>
+            </details>
+          )}
+          <button onClick={() => { this.setState({ hasError: false, error: null, errorInfo: null }); }} style={{ marginTop: '1rem', padding: '0.5rem 1.25rem', background: '#1e293b', color: '#fff', border: 'none', borderRadius: '0.375rem', cursor: 'pointer', fontWeight: 600 }}>
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Page router per role
 const pageComponents = {
   admin: {
@@ -98,9 +137,12 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <AppProvider>
-    <AppContent />
-  </AppProvider>
+  <ErrorBoundary>
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
+  </ErrorBoundary>
 );
 
 export default App;
+

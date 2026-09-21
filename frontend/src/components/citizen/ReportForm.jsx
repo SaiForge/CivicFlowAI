@@ -24,6 +24,7 @@ import {
   Trash2,
   Radio,
   FileAudio,
+  Sparkles,
 } from 'lucide-react';
 
 const MAX_FILE_SIZE_MB = 20;
@@ -99,6 +100,8 @@ const ReportForm = () => {
   const audioContextRef = useRef(null);
   const analyserRef = useRef(null);
   const animFrameRef = useRef(null);
+  // Guard against state updates after component unmounts (prevents crash on submit)
+  const isMountedRef = useRef(true);
 
   const fileRef = useRef();
 
@@ -229,8 +232,16 @@ const ReportForm = () => {
   }, [reportFormOpen]);
 
   // ── Cleanup Speech & Audio on Unmount ─────────────────────────────────────
+  // NOTE: capturedAudioUrl intentionally NOT in deps — we only want this to run
+  // on actual unmount, not every time the URL changes (which would prematurely
+  // revoke blob URLs while the audio element is still live).
+  const capturedAudioUrlRef = useRef(null);
+  useEffect(() => { capturedAudioUrlRef.current = capturedAudioUrl; }, [capturedAudioUrl]);
+
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
+      isMountedRef.current = false;
       if (recognitionRef.current) {
         try { recognitionRef.current.abort(); } catch {}
       }
@@ -249,14 +260,15 @@ const ReportForm = () => {
       if (audioContextRef.current) {
         try { audioContextRef.current.close(); } catch {}
       }
-      if (capturedAudioUrl) {
-        URL.revokeObjectURL(capturedAudioUrl);
+      if (capturedAudioUrlRef.current) {
+        URL.revokeObjectURL(capturedAudioUrlRef.current);
       }
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         try { window.speechSynthesis.cancel(); } catch {}
       }
     };
-  }, [capturedAudioUrl]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Captured Voice Note Audio Handlers ────────────────────────────────────
   const handleTogglePlayAudio = () => {
@@ -648,14 +660,11 @@ const ReportForm = () => {
         fd.append('audio', capturedAudioBlob, 'citizen_voice.webm');
       }
 
-      // Initiate submission promise
+      // Initiate submission promise — captured BEFORE closing the form
       const submitPromise = complaintsApi.submit(fd);
 
-      // Close the form drawer immediately and transition to AI Processing Screen
-      setReportFormOpen(false);
-
-      // Launch the AI Processing Screen with live state & promise
-      setProcessingSubmission({
+      // Snapshot the current form state for the processing screen
+      const processingPayload = {
         promise: submitPromise,
         category: form.category,
         location: form.location,
@@ -665,11 +674,21 @@ const ReportForm = () => {
         imagesCount: files.length,
         isSensitive: isSensitive,
         hasVoiceNote: Boolean(capturedAudioBlob),
-      });
+      };
+
+      // Close the form drawer and launch AI Processing Screen atomically.
+      // Set processingSubmission FIRST so IssueProcessingScreen can mount
+      // before ReportForm unmounts — prevents any state update on unmounted component.
+      setProcessingSubmission(processingPayload);
+      setReportFormOpen(false);
+      // setLoading(false) intentionally omitted — component is unmounting immediately
 
     } catch (err) {
-      setError(err.message || 'Submission failed. Please try again.');
-      setLoading(false);
+      // Synchronous build errors (should not happen in practice)
+      if (isMountedRef.current) {
+        setError(err.message || 'Submission failed. Please try again.');
+        setLoading(false);
+      }
     }
   };
 

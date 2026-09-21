@@ -48,6 +48,14 @@ export const AppProvider = ({ children }) => {
       try {
         es = new EventSource(`${apiBase}/api/events`);
 
+        es.onmessage = (e) => {
+          try {
+            const payload = JSON.parse(e.data);
+            console.log('[Realtime SSE message]:', payload);
+            setRefreshTrigger((prev) => prev + 1);
+          } catch {}
+        };
+
         es.addEventListener('update', (e) => {
           try {
             const payload = JSON.parse(e.data);
