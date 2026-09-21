@@ -750,7 +750,14 @@ const IssueProcessingScreen = () => {
                   <div className="agent-point-item">
                     <X size={14} style={{ color: '#dc2626' }} className="agent-point-icon" />
                     <div>
-                      <strong>Quality Gate Rejection:</strong> Gate 9 Cross-Modal Domain Consistency failed. The uploaded image does not match the civic category or text description provided in the complaint.
+                      <strong>Submission Blocked:</strong> No complaint ticket was created in the municipal database. Your grievance was not submitted and will not appear on municipal work orders.
+                    </div>
+                  </div>
+
+                  <div className="agent-point-item">
+                    <X size={14} style={{ color: '#dc2626' }} className="agent-point-icon" />
+                    <div>
+                      <strong>Quality Gate Rejection:</strong> Gate 9 Cross-Modal Domain Consistency failed. The uploaded image does not corroborate the civic category or text description provided.
                     </div>
                   </div>
 

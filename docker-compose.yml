@@ -112,6 +112,8 @@ services:
     restart: always
     ports:
       - "5001:5000"
+    env_file:
+      - ./agent/.env
     environment:
       - AGENT_SERVICE_URL=http://agent:8000
       - BACKEND_PORT=5000
@@ -120,6 +122,12 @@ services:
       - SECRET_KEY=${SECRET_KEY:-change_me_in_production_civicflow_2024}
       - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-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}
+      - OPENROUTER_MODEL_NAME=${OPENROUTER_MODEL_NAME:-inclusionai/ling-3.0-flash-vl:free}
+      - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
       - ./backend:/backend
     command: uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload

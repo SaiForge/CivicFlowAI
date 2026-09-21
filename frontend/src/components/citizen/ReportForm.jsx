@@ -81,6 +81,8 @@ const ReportForm = () => {
   const audioChunksRef = useRef([]);
   const mediaStreamRef = useRef(null);
   const activeTargetFieldRef = useRef('description');
+  const isListeningRef = useRef(false);
+  const initialTextBeforeVoiceRef = useRef('');
 
   const fileRef = useRef();
 
@@ -276,22 +278,20 @@ const ReportForm = () => {
 
     if (targetField === 'description') {
       setForm((prev) => {
-        const prevText = prev.description ? prev.description.trim() + ' ' : '';
-        const newDesc = prevText + clean;
+        const base = initialTextBeforeVoiceRef.current ? initialTextBeforeVoiceRef.current.trim() + ' ' : '';
+        const newDesc = (base + clean).trim();
 
         // Auto-detect civic category from keywords
         let autoCat = prev.category;
-        if (!autoCat) {
-          const low = newDesc.toLowerCase();
-          if (/pothole|road|asphalt|crater|pavement|tar/i.test(low)) autoCat = 'Road';
-          else if (/garbage|trash|waste|dump|debris|litter|rubbish/i.test(low)) autoCat = 'Waste';
-          else if (/water|pipe|leak|pipeline|tap/i.test(low)) autoCat = 'Water';
-          else if (/streetlight|street light|light|lamp|pole/i.test(low)) autoCat = 'Streetlight';
-          else if (/drain|drainage|sewage|gutter|overflow|manhole/i.test(low)) autoCat = 'Drainage';
-          else if (/bridge|footpath|sidewalk|park|infrastructure/i.test(low)) autoCat = 'Infrastructure';
-          if (autoCat && autoCat !== prev.category) {
-            setVoiceDetectedCat(autoCat);
-          }
+        const low = newDesc.toLowerCase();
+        if (/pothole|road|asphalt|crater|pavement|tar/i.test(low)) autoCat = 'Road';
+        else if (/garbage|trash|waste|dump|debris|litter|rubbish/i.test(low)) autoCat = 'Waste';
+        else if (/water|pipe|leak|pipeline|tap/i.test(low)) autoCat = 'Water';
+        else if (/streetlight|street light|light|lamp|pole/i.test(low)) autoCat = 'Streetlight';
+        else if (/drain|drainage|sewage|gutter|overflow|manhole/i.test(low)) autoCat = 'Drainage';
+        else if (/bridge|footpath|sidewalk|park|infrastructure/i.test(low)) autoCat = 'Infrastructure';
+        if (autoCat && autoCat !== prev.category) {
+          setVoiceDetectedCat(autoCat);
         }
 
         return {
@@ -301,10 +301,13 @@ const ReportForm = () => {
         };
       });
     } else if (targetField === 'location') {
-      setForm((prev) => ({
-        ...prev,
-        location: (prev.location ? prev.location.trim() + ', ' : '') + clean,
-      }));
+      setForm((prev) => {
+        const base = initialTextBeforeVoiceRef.current ? initialTextBeforeVoiceRef.current.trim() + ', ' : '';
+        return {
+          ...prev,
+          location: (base + clean).trim(),
+        };
+      });
     }
   };
 
@@ -314,6 +317,8 @@ const ReportForm = () => {
     setVoiceDetectedCat(null);
     setTranscriptionSuccess(null);
     activeTargetFieldRef.current = targetField;
+    initialTextBeforeVoiceRef.current = form[targetField] || '';
+    isListeningRef.current = true;
 
     // Stop active speaker read-aloud
     if (typeof window !== 'undefined' && 'speechSynthesis' in window && window.speechSynthesis.speaking) {
@@ -326,7 +331,7 @@ const ReportForm = () => {
       try { recognitionRef.current.abort(); } catch {}
     }
 
-    // 1. Initialize Audio Recorder (captures microphone audio for AI fallback)
+    // 1. Initialize Audio Recorder (captures raw microphone audio for Whisper AI backend)
     audioChunksRef.current = [];
     if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
@@ -339,11 +344,12 @@ const ReportForm = () => {
           }
         };
         mediaRecorderRef.current = recorder;
-        recorder.start();
+        recorder.start(250); // Slice audio chunks every 250ms
       } catch (micErr) {
         console.warn('Microphone stream access error:', micErr);
         if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-          setVoiceError('Microphone permission blocked. Please allow microphone access in browser settings, or click a quick sample below.');
+          setVoiceError('Microphone access was denied. Please allow microphone permissions in your browser.');
+          isListeningRef.current = false;
           return;
         }
       }
@@ -365,15 +371,14 @@ const ReportForm = () => {
     // 2. Start Web Speech Recognition if available in browser
     const SpeechRecognition = typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
     if (!SpeechRecognition) {
-      // Browser does not support Web Speech API; MediaRecorder will handle transcription on Stop
       return;
     }
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
+      recognition.continuous = false; // Single utterance mode prevents Chrome websocket resets
       recognition.interimResults = true;
-      recognition.lang = voiceLang;
+      recognition.lang = voiceLang || 'en-IN';
 
       recognition.onresult = (event) => {
         let interim = '';
@@ -396,18 +401,23 @@ const ReportForm = () => {
       };
 
       recognition.onerror = (event) => {
-        console.warn('Speech recognition warning:', event.error);
         if (event.error === 'not-allowed') {
           setVoiceError('Microphone permission denied in browser.');
         } else if (event.error === 'network') {
-          // Google Web Speech API server unreachable (common in Brave, non-HTTPS, or strict firewalls)
-          // Don't kill the recording — audio recorder is capturing microphone audio!
-          setVoiceError('Google Speech server unavailable on current network/browser. Audio is actively recording — click "Stop" when done to transcribe via AI!');
+          // Google Web Speech API server unreachable — raw MediaRecorder audio will be transcribed via backend Whisper AI on stop!
+          console.info('WebSpeech network note; audio recorder captures raw stream for AI transcription.');
+        } else if (event.error === 'no-speech') {
+          // Normal pause in speech, ignore
         }
       };
 
       recognition.onend = () => {
-        // Recognition ended; if audio recording is still active, keep timer until user stops
+        // If user is still recording, auto-restart speech recognition loop seamlessly
+        if (isListeningRef.current && recognitionRef.current === recognition) {
+          try {
+            recognition.start();
+          } catch {}
+        }
       };
 
       recognitionRef.current = recognition;
@@ -419,6 +429,7 @@ const ReportForm = () => {
 
   const stopVoiceRecognition = () => {
     const targetField = activeTargetFieldRef.current || 'description';
+    isListeningRef.current = false;
 
     if (recognitionRef.current) {
       try {
@@ -435,7 +446,7 @@ const ReportForm = () => {
       timerRef.current = null;
     }
 
-    // Process recorded audio through AI Backend Transcription
+    // Process recorded audio through AI Backend Transcription (Whisper AI)
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       const recorder = mediaRecorderRef.current;
       recorder.onstop = async () => {
@@ -447,21 +458,19 @@ const ReportForm = () => {
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         // Send to backend if audio has content
-        if (audioBlob && audioBlob.size > 250) {
+        if (audioBlob && audioBlob.size > 200) {
           try {
             setIsTranscribing(true);
             const res = await voiceApi.transcribe(audioBlob, voiceLang);
             if (res && res.text && res.text.trim()) {
               applyTranscribedText(res.text.trim(), targetField);
-              setTranscriptionSuccess(`Transcribed via ${res.provider || 'AI Voice'}`);
+              const preview = res.text.trim().slice(0, 30);
+              setTranscriptionSuccess(`✓ Transcribed: "${preview}${res.text.trim().length > 30 ? '…' : ''}"`);
               setVoiceError(null);
-            } else if (res && res.message && !res.text) {
-              if (res.status === 'unsupported') {
-                setVoiceError(res.message);
-              }
+              setTimeout(() => setTranscriptionSuccess(null), 5000);
             }
           } catch (sttErr) {
-            console.warn('AI audio transcription service message:', sttErr);
+            console.warn('AI audio transcription service note:', sttErr);
           } finally {
             setIsTranscribing(false);
           }
@@ -659,40 +668,22 @@ const ReportForm = () => {
               </div>
             </div>
 
-            {/* Voice Error Alert with Quick Civic Templates Fallback */}
+            {/* Dismissible Microphone Permission Alert */}
             {voiceError && (
-              <div className="voice-error-banner">
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.45rem' }}>
-                  <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
-                  <div>
-                    <div style={{ fontWeight: 600, marginBottom: '2px' }}>Voice Service Notice</div>
-                    <div>{voiceError}</div>
-                  </div>
+              <div className="voice-error-banner" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', padding: '0.5rem 0.75rem', borderRadius: '0.5rem', background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#dc2626' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                  <AlertCircle size={13} style={{ flexShrink: 0 }} />
+                  <span style={{ fontSize: '0.78rem' }}>{voiceError}</span>
                 </div>
-                <div className="voice-error-actions">
-                  <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: 500 }}>
-                    Quick sample templates (1-click fill):
-                  </span>
-                  <div className="voice-presets-row">
-                    {QUICK_PRESETS.map((preset) => (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        className="voice-preset-pill"
-                        onClick={() => applyPreset(preset)}
-                        title={preset.desc}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <button type="button" onClick={() => setVoiceError(null)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#dc2626', display: 'flex', alignItems: 'center', padding: '2px' }}>
+                  <X size={13} />
+                </button>
               </div>
             )}
 
             {/* Transcription Success Badge */}
             {transcriptionSuccess && (
-              <div className="voice-success-pill">
+              <div className="voice-success-pill" style={{ marginBottom: '0.5rem' }}>
                 <CheckCircle2 size={12} color="#16a34a" />
                 <span>{transcriptionSuccess}</span>
               </div>
@@ -710,7 +701,7 @@ const ReportForm = () => {
                     <span className="voice-bar bar-5" />
                   </div>
                   <span className="voice-status-text">
-                    {interimText ? `“${interimText}”` : "Listening / Recording... Speak clearly"}
+                    {interimText ? `“${interimText}”` : "Listening… Speak your civic problem clearly"}
                   </span>
                 </div>
                 <div className="voice-panel-right">
@@ -744,6 +735,29 @@ const ReportForm = () => {
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               required
             />
+
+            {/* Quick Sample Presets (Always accessible 1-click fill) */}
+            <div style={{ marginTop: '0.45rem', marginBottom: '0.35rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', marginBottom: '0.3rem' }}>
+                <Sparkles size={11} color="var(--primary-orange)" />
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.02em', textTransform: 'uppercase' }}>
+                  Quick 1-click sample templates:
+                </span>
+              </div>
+              <div className="voice-presets-row" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+                {QUICK_PRESETS.map((preset) => (
+                  <button
+                    key={preset.label}
+                    type="button"
+                    className="voice-preset-pill"
+                    onClick={() => applyPreset(preset)}
+                    title={preset.desc}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Auto-detected Category Tag */}
             {voiceDetectedCat && (

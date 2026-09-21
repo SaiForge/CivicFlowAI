@@ -56,6 +56,12 @@ def startup():
     except Exception as e:
         logger.warning(f"Schema patch notice: {e}")
     _seed_demo_data()
+    try:
+        from app.routes import purge_rejected_complaints
+        with SessionLocal() as db:
+            purge_rejected_complaints(db)
+    except Exception as e:
+        logger.warning(f"Initial purge check notice: {e}")
     logger.info("CivicFlowAI Backend ready.")
 
 

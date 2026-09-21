@@ -15,7 +15,7 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # ── Serve Stage ──────────────────────────────────────────────
-FROM nginx:1.25-alpine
+FROM nginx:alpine
 
 # Copy built SPA
 COPY --from=builder /app/dist /usr/share/nginx/html

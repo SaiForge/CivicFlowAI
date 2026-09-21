@@ -345,7 +345,28 @@ async def transcribe_voice(
         else:
             mime = "audio/webm"
 
-        # 1. Try Google Chromium Speech API (Free, high-accuracy, zero key required)
+        # 1. Try OpenRouter Audio Transcriptions API (openai/whisper-large-v3)
+        if settings.OPENROUTER_API_KEY:
+            try:
+                whisper_url = f"{settings.OPENROUTER_BASE_URL.rstrip('/')}/audio/transcriptions"
+                headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
+                files = {"file": (target_file.filename or "audio.webm", audio_bytes, mime)}
+                data = {"model": "openai/whisper-large-v3"}
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    resp = await client.post(whisper_url, headers=headers, files=files, data=data)
+                    if resp.status_code == 200:
+                        text_result = resp.json().get("text", "").strip()
+                        if text_result:
+                            logger.info(f"Successfully transcribed audio via OpenRouter Whisper Large: {text_result}")
+                            return {
+                                "status": "success",
+                                "text": text_result,
+                                "provider": "Whisper AI (OpenRouter)",
+                            }
+            except Exception as e:
+                logger.warning(f"OpenRouter audio transcriptions endpoint attempt: {e}")
+
+        # 2. Try Google Chromium Speech API (Free, high-accuracy, zero key required)
         try:
             lang_code = "en-IN" if "in" in (language or "").lower() else (language or "en-US")
             chromium_url = f"https://www.google.com/speech-api/v2/recognize?client=chromium&lang={lang_code}&maxresults=1"
@@ -376,7 +397,7 @@ async def transcribe_voice(
         except Exception as e:
             logger.warning(f"Google Chromium speech API attempt note: {e}")
 
-        # 2. Try OpenRouter Multimodal Chat Completion with Audio
+        # 3. Try OpenRouter Multimodal Chat Completion with Audio
         if settings.OPENROUTER_API_KEY:
             try:
                 b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
@@ -578,6 +599,21 @@ def get_me(current_user: User = Depends(require_user)):
 # COMPLAINTS
 # ─────────────────────────────────────────────────────────────
 
+def purge_rejected_complaints(db: Session):
+    """Purges any lingering rejected complaints so failed issues never persist or show in queries."""
+    try:
+        rejected = db.query(Complaint).filter(Complaint.status == "Rejected").all()
+        if rejected:
+            rej_ids = [c.id for c in rejected]
+            logger.info(f"Purging {len(rej_ids)} rejected complaint(s) from database: {rej_ids}")
+            db.query(ComplaintImage).filter(ComplaintImage.complaint_id.in_(rej_ids)).delete(synchronize_session=False)
+            db.query(Complaint).filter(Complaint.id.in_(rej_ids)).delete(synchronize_session=False)
+            db.commit()
+    except Exception as e:
+        logger.warning(f"Error purging rejected complaints: {e}")
+        db.rollback()
+
+
 complaints_router = APIRouter(prefix="/api/complaints", tags=["Complaints"])
 
 
@@ -595,7 +631,8 @@ async def list_complaints(
     if cached is not None:
         return cached
 
-    q = db.query(Complaint)
+    # Strictly filter out any rejected issues
+    q = db.query(Complaint).filter(Complaint.status != "Rejected")
     if dept:
         q = q.filter(Complaint.dept == dept)
     if status:
@@ -623,11 +660,13 @@ async def submit_complaint(
     current_user: Optional[User] = Depends(get_current_user),
 ):
     """
-    Accept a multipart complaint submission with strict validation:
+    Accept a multipart complaint submission with strict multi-agent validation:
     1. Validates necessary fields (description >= 10 chars, valid location).
-    2. Physical issues like Road Damage REQUIRE photographic evidence.
-    3. Sensitive/confidential issues where images cannot be captured/shared are accepted without photos.
-    4. Forwards to Multi-Agent Engine for deliberation.
+    2. Physical issues like Road Damage REQUIRE photographic evidence (< 15 days old).
+    3. Forwards to Multi-Agent Engine BEFORE creating or committing any record to PostgreSQL.
+    4. If the agent rejects the issue (cross-modal contradiction, invalid evidence),
+       the request fails immediately with 422 and NOTHING is committed to the database.
+    5. Only approved grievances are assigned ticket IDs and persisted.
     """
     desc_clean = (description or "").strip()
     is_valid_text, reason = _is_meaningful_text(desc_clean)
@@ -708,58 +747,10 @@ async def submit_complaint(
             )
         )
 
-    ticket_id = _next_ticket_id(db)
-    now = datetime.utcnow()
-
     valid_cat = _map_category(category, description)
     valid_dept = _map_dept("", valid_cat)
 
-    complaint = Complaint(
-        id=ticket_id,
-        category=valid_cat,
-        issue=f"{valid_cat} Issue",
-        dept=valid_dept,
-        description=description,
-        location=location,
-        lat=lat,
-        lng=lng,
-        is_sensitive=sensitive_flag,
-        status="Submitted",
-        priority="Medium",
-        citizen_id=current_user.id if current_user else None,
-        submitted_at=now,
-        last_updated=now,
-        report_count=1,
-    )
-    timeline_events = [{
-        "event": "Complaint submitted by citizen",
-        "ts": now.isoformat(),
-        "actor": current_user.name if current_user else "Citizen",
-    }]
-    if sensitive_flag and not has_images:
-        timeline_events.append({
-            "event": "Photographic evidence waived (sensitive / confidential issue)",
-            "ts": now.isoformat(),
-            "actor": "System Governance",
-        })
-    complaint.timeline = timeline_events
-    db.add(complaint)
-    db.flush()  # get complaint.id before committing
-
-    # ── Save uploaded images ────────────────────────────────────
-    for item in validated_images:
-        img_record = ComplaintImage(
-            complaint_id=ticket_id,
-            image_data=item["data"],
-            mime_type=item["mime_type"],
-            original_filename=item["filename"],
-            image_type="evidence",
-        )
-        db.add(img_record)
-
-    db.commit()
-
-    # ── Forward to Agent for AI processing ─────────────────────
+    # ── Forward to Agent for AI deliberation BEFORE any database insertion ──
     agent_payload = {
         "text": f"{'[CONFIDENTIAL/SENSITIVE] ' if sensitive_flag else ''}{valid_cat}: {description}. Location: {location}. {details}".strip(),
         "category": valid_cat,
@@ -771,6 +762,7 @@ async def submit_complaint(
         "is_sensitive": sensitive_flag,
     }
 
+    agent_data = None
     try:
         async with httpx.AsyncClient(timeout=240.0) as client:
             resp = await client.post(
@@ -788,117 +780,152 @@ async def submit_complaint(
             )
 
             if is_rejected:
-                complaint.status = "Rejected"
                 fail_msg = (
                     rejection_reason
                     or verification.get("reasoning")
                     or "Photographic evidence contradicts the reported issue description and category."
                 )
-                tl = complaint.timeline or []
-                tl.append({
-                    "event": f"Submission rejected: {fail_msg}",
-                    "ts": datetime.utcnow().isoformat(),
-                    "actor": "CivicFlow Verification AI",
-                })
-                complaint.timeline = tl
-                complaint.last_updated = datetime.utcnow()
-                db.commit()
-
-                # Terminate submission immediately with 422 so citizen is notified of evidence mismatch
+                logger.warning(f"Submission rejected by AI Agent: {fail_msg}")
+                # Terminate submission immediately with 422 — NO DB RECORD CREATED!
                 raise HTTPException(
                     status_code=422,
                     detail=f"Submission rejected: Photographic evidence does not corroborate your report. {fail_msg}"
                 )
 
-            # Apply AI outputs back to the complaint
-            complaint.priority = _map_severity(agent_data.get("severity", "Medium"))
-            complaint.issue = agent_data.get("issue_type", f"{valid_cat} Issue")
-
-            # Check if agent detected visual truth / category mismatch
-            agent_cat = _map_category(agent_data.get("category") or agent_data.get("issue_type", ""), description)
-            category_rectified = bool(agent_data.get("category_rectified"))
-
-            if agent_cat != "Other" and agent_cat != complaint.category:
-                orig_cat = complaint.category
-                complaint.category = agent_cat
-                category_rectified = True
-
-            # Map department accurately from agent output + category fallback
-            complaint.dept = _map_dept(agent_data.get("department", ""), complaint.category)
-
-            # Group into or create incident cluster
-            complaint.incident_id = _find_or_create_incident(db, complaint, agent_data)
-
-            complaint.ai_classification = {
-                "category": complaint.category,
-                "confidence": agent_data.get("issue_confidence", 0.85),
-                "rectified": category_rectified,
-                "original_category": valid_cat if category_rectified else None,
-            }
-            complaint.ai_severity = {
-                "priority": complaint.priority,
-                "reasoning": (agent_data.get("raw_incident") or {}).get("reasoning", ""),
-            }
-            complaint.agent_steps = _build_agent_steps(agent_data)
-            complaint.agent_thoughts = agent_data.get("agent_thoughts") or {
-                "issue": {
-                    "issue_type": complaint.issue,
-                    "confidence": agent_data.get("issue_confidence", 0.95),
-                    "reasoning": (agent_data.get("raw_incident") or {}).get("description") or f"Identified as {complaint.issue} based on citizen description.",
-                },
-                "evidence": {
-                    "grounding_score": agent_data.get("grounding_score", 0.8),
-                    "reasoning": "Visual evidence and textual spatial cues evaluated for authenticity.",
-                },
-                "severity": {
-                    "severity": complaint.priority,
-                    "severity_score": agent_data.get("severity_score", 65.0),
-                    "reasoning": (agent_data.get("ai_severity") or {}).get("reasoning") or f"Assessed priority as {complaint.priority} based on public safety risk and impact.",
-                },
-                "routing": {
-                    "primary_department": agent_data.get("department") or DEPT_NAMES.get(complaint.dept, complaint.dept),
-                    "reasoning": f"Complaint routed to {agent_data.get('department') or DEPT_NAMES.get(complaint.dept, complaint.dept)} for municipal field triage.",
-                },
-                "verification": agent_data.get("verification") or {
-                    "approved": True,
-                    "reasoning": "Statutory citizen charter criteria satisfied.",
-                },
-            }
-            tl = complaint.timeline or []
-            if category_rectified and valid_cat != complaint.category:
-                tl.append({
-                    "event": f"Category rectified by Visual AI: Switched from {valid_cat} to {complaint.category} (matched image content)",
-                    "ts": datetime.utcnow().isoformat(),
-                    "actor": "CivicFlow Vision AI",
-                })
-            tl.append({
-                "event": "AI classification completed",
-                "ts": datetime.utcnow().isoformat(),
-                "actor": "CivicFlow AI",
-            })
-            complaint.timeline = tl
-            complaint.status = "Under Review"
-            complaint.last_updated = datetime.utcnow()
-
-            db.commit()
         elif resp.status_code == 422:
             agent_err = resp.json().get("detail", "Photographic evidence contradicts reported grievance.")
-            complaint.status = "Rejected"
-            db.commit()
+            logger.warning(f"Submission rejected by Agent (422): {agent_err}")
             raise HTTPException(
                 status_code=422,
                 detail=f"Submission rejected: {agent_err}"
             )
     except HTTPException:
-        # Crucial: Let intentional rejection HTTPExceptions bubble up to the client!
+        # Re-raise validation and rejection HTTPExceptions without touching database
         raise
     except Exception as exc:
-        logger.warning(f"Agent unavailable, saving complaint without AI: {exc}")
+        logger.warning(f"Agent unavailable, proceeding with valid citizen submission: {exc}")
 
-    # Ensure incident is linked even if agent is unreachable
-    if not complaint.incident_id:
+    # ── ONLY PERSIST COMPLAINT IF APPROVED ──────────────────────────────
+    ticket_id = _next_ticket_id(db)
+    now = datetime.utcnow()
+
+    final_cat = valid_cat
+    category_rectified = False
+    final_priority = "Medium"
+    final_issue = f"{valid_cat} Issue"
+    final_dept = valid_dept
+
+    if agent_data:
+        final_priority = _map_severity(agent_data.get("severity", "Medium"))
+        final_issue = agent_data.get("issue_type", f"{valid_cat} Issue")
+
+        agent_cat = _map_category(agent_data.get("category") or agent_data.get("issue_type", ""), description)
+        category_rectified = bool(agent_data.get("category_rectified"))
+        if agent_cat != "Other" and agent_cat != valid_cat:
+            final_cat = agent_cat
+            category_rectified = True
+
+        final_dept = _map_dept(agent_data.get("department", ""), final_cat)
+
+    complaint = Complaint(
+        id=ticket_id,
+        category=final_cat,
+        issue=final_issue,
+        dept=final_dept,
+        description=description,
+        location=location,
+        lat=lat,
+        lng=lng,
+        is_sensitive=sensitive_flag,
+        status="Under Review",
+        priority=final_priority,
+        citizen_id=current_user.id if current_user else None,
+        submitted_at=now,
+        last_updated=now,
+        report_count=1,
+    )
+
+    timeline_events = [{
+        "event": "Complaint submitted by citizen",
+        "ts": now.isoformat(),
+        "actor": current_user.name if current_user else "Citizen",
+    }]
+    if sensitive_flag and not has_images:
+        timeline_events.append({
+            "event": "Photographic evidence waived (sensitive / confidential issue)",
+            "ts": now.isoformat(),
+            "actor": "System Governance",
+        })
+    if category_rectified and valid_cat != final_cat:
+        timeline_events.append({
+            "event": f"Category rectified by Visual AI: Switched from {valid_cat} to {final_cat} (matched image content)",
+            "ts": now.isoformat(),
+            "actor": "CivicFlow Vision AI",
+        })
+    if agent_data:
+        timeline_events.append({
+            "event": "AI classification & multi-agent verification completed",
+            "ts": now.isoformat(),
+            "actor": "CivicFlow AI",
+        })
+
+    complaint.timeline = timeline_events
+
+    if agent_data:
+        complaint.incident_id = _find_or_create_incident(db, complaint, agent_data)
+        complaint.ai_classification = {
+            "category": complaint.category,
+            "confidence": agent_data.get("issue_confidence", 0.85),
+            "rectified": category_rectified,
+            "original_category": valid_cat if category_rectified else None,
+        }
+        complaint.ai_severity = {
+            "priority": complaint.priority,
+            "reasoning": (agent_data.get("raw_incident") or {}).get("reasoning", ""),
+        }
+        complaint.agent_steps = _build_agent_steps(agent_data)
+        complaint.agent_thoughts = agent_data.get("agent_thoughts") or {
+            "issue": {
+                "issue_type": complaint.issue,
+                "confidence": agent_data.get("issue_confidence", 0.95),
+                "reasoning": (agent_data.get("raw_incident") or {}).get("description") or f"Identified as {complaint.issue} based on citizen description.",
+            },
+            "evidence": {
+                "grounding_score": agent_data.get("grounding_score", 0.8),
+                "reasoning": "Visual evidence and textual spatial cues evaluated for authenticity.",
+            },
+            "severity": {
+                "severity": complaint.priority,
+                "severity_score": agent_data.get("severity_score", 65.0),
+                "reasoning": (agent_data.get("ai_severity") or {}).get("reasoning") or f"Assessed priority as {complaint.priority} based on public safety risk and impact.",
+            },
+            "routing": {
+                "primary_department": agent_data.get("department") or DEPT_NAMES.get(complaint.dept, complaint.dept),
+                "reasoning": f"Complaint routed to {agent_data.get('department') or DEPT_NAMES.get(complaint.dept, complaint.dept)} for municipal field triage.",
+            },
+            "verification": agent_data.get("verification") or {
+                "approved": True,
+                "reasoning": "Statutory citizen charter criteria satisfied.",
+            },
+        }
+    else:
         complaint.incident_id = _find_or_create_incident(db, complaint, {})
-        db.commit()
+
+    db.add(complaint)
+    db.flush()
+
+    # Save uploaded images
+    for item in validated_images:
+        img_record = ComplaintImage(
+            complaint_id=ticket_id,
+            image_data=item["data"],
+            mime_type=item["mime_type"],
+            original_filename=item["filename"],
+            image_type="evidence",
+        )
+        db.add(img_record)
+
+    db.commit()
 
     # Activity + notification with accurate department display
     dept_label = DEPT_NAMES.get(complaint.dept, complaint.dept)
@@ -1194,12 +1221,12 @@ async def admin_stats(
     if cached is not None:
         return AdminStatsOut(**cached)
 
-    total    = db.query(func.count(Complaint.id)).scalar() or 0
+    total    = db.query(func.count(Complaint.id)).filter(Complaint.status != "Rejected").scalar() or 0
     active   = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(ACTIVE_STATUSES)).scalar() or 0
     resolved = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(RESOLVED_STATUSES)).scalar() or 0
     pending  = db.query(func.count(Complaint.id)).filter(Complaint.status == "Under Review").scalar() or 0
     escalated= db.query(func.count(Complaint.id)).filter(Complaint.status == "Escalated").scalar() or 0
-    critical = db.query(func.count(Complaint.id)).filter(Complaint.priority == "Critical").scalar() or 0
+    critical = db.query(func.count(Complaint.id)).filter(Complaint.priority == "Critical", Complaint.status != "Rejected").scalar() or 0
     res = AdminStatsOut(total=total, active=active, resolved=resolved,
                          pending=pending, escalated=escalated, critical=critical)
     await set_cache("civicflow:stats:admin", res.model_dump(), ttl=60)
@@ -1214,6 +1241,7 @@ async def category_breakdown(db: Session = Depends(get_db)):
 
     rows = (
         db.query(Complaint.category, func.count(Complaint.id).label("cnt"))
+        .filter(Complaint.status != "Rejected")
         .group_by(Complaint.category)
         .order_by(desc("cnt"))
         .all()
@@ -1236,6 +1264,7 @@ async def status_breakdown(db: Session = Depends(get_db)):
 
     rows = (
         db.query(Complaint.status, func.count(Complaint.id).label("cnt"))
+        .filter(Complaint.status != "Rejected")
         .group_by(Complaint.status)
         .order_by(desc("cnt"))
         .all()
@@ -1253,7 +1282,7 @@ async def dept_performance(db: Session = Depends(get_db)):
 
     result = []
     for dept_id, dept_name in DEPT_NAMES.items():
-        base_q = db.query(Complaint).filter(Complaint.dept == dept_id)
+        base_q = db.query(Complaint).filter(Complaint.dept == dept_id, Complaint.status != "Rejected")
         assigned   = base_q.count()
         in_prog    = base_q.filter(Complaint.status == "In Progress").count()
         resolved   = base_q.filter(Complaint.status.in_(RESOLVED_STATUSES)).count()
@@ -1307,6 +1336,7 @@ async def map_markers(db: Session = Depends(get_db)):
 
     complaints = (
         db.query(Complaint)
+        .filter(Complaint.status != "Rejected")
         .order_by(desc(Complaint.submitted_at))
         .all()
     )
