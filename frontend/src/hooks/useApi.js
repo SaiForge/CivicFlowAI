@@ -113,5 +113,10 @@ export function useAreaStats(pollInterval = 5000) {
 // ── Notifications ─────────────────────────────────────────────────────────────
 
 export function useNotifications(pollInterval = 6000) {
-  return useApiCall(() => notificationsApi.list(), [], pollInterval);
+  const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('civicflow_token');
+  return useApiCall(
+    () => (hasToken ? notificationsApi.list() : Promise.resolve([])),
+    [hasToken],
+    hasToken ? pollInterval : 0
+  );
 }

@@ -46,6 +46,17 @@ const IssueProcessingScreen = () => {
       .then((data) => {
         apiDataRef.current = data;
         setIsApiReady(true);
+        if (data?.id) {
+          try {
+            const stored = JSON.parse(localStorage.getItem('civicflow_user_tickets') || '[]');
+            if (!stored.includes(data.id)) {
+              stored.unshift(data.id);
+              localStorage.setItem('civicflow_user_tickets', JSON.stringify(stored));
+            }
+          } catch (e) {
+            console.warn('Could not save user ticket to localStorage:', e);
+          }
+        }
         // Immediately update all role dashboards (citizen, admin, dept) when complaint is confirmed
         if (triggerRefresh) triggerRefresh();
       })

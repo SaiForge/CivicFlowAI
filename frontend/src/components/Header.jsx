@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { citizenNotifications } from '../data/mockData';
+import { useNotifications } from '../hooks/useApi';
 import { 
   Bell, User, Menu, X, ChevronRight, LogOut, ShieldCheck
 } from 'lucide-react';
@@ -29,7 +29,8 @@ const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const navLinks = navByRole[role] || navByRole.citizen;
-  const unread = role === 'citizen' ? citizenNotifications.filter(n => !n.read).length : 0;
+  const { data: notifData } = useNotifications();
+  const unread = role === 'citizen' ? (notifData || []).filter(n => !n.read).length : 0;
   const isAdmin = role === 'admin' || currentUser?.role === 'admin';
   const isDept = role === 'dept' || currentUser?.role === 'dept';
 
@@ -87,7 +88,17 @@ const Header = () => {
           )}
 
           {/* Bell */}
-          <button className="btn-icon" aria-label="Notifications" style={{ position: 'relative' }}>
+          <button
+            className="btn-icon"
+            aria-label="Notifications"
+            style={{ position: 'relative' }}
+            onClick={() => {
+              if (role === 'citizen') {
+                setActivePage('notifs');
+              }
+            }}
+            title={unread > 0 ? `${unread} unread municipal alerts` : 'Municipal Notifications'}
+          >
             <Bell size={16} strokeWidth={1.75} />
             {unread > 0 && <span className="notif-badge">{unread}</span>}
           </button>

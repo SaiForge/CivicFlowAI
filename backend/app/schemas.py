@@ -148,6 +148,7 @@ class AdminStatsOut(BaseModel):
     pending: int
     escalated: int
     critical: int
+    dispatched: Optional[int] = 0
 
 
 class CategoryBreakdownItem(BaseModel):

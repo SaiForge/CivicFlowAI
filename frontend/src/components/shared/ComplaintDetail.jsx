@@ -9,7 +9,7 @@ import { X, MapPin, ThumbsUp, ThumbsDown, Upload, Loader2, Mic, Play, Pause, Fil
 const DEPT_STATUSES = ['Submitted','Under Review','Assigned','In Progress','Resolution Submitted','Verification Pending','Resolved'];
 
 const ComplaintDetail = () => {
-  const { role, detailOpen, closeDetail, selectedComplaintId, currentUser } = useApp();
+  const { role, detailOpen, closeDetail, selectedComplaintId, currentUser, triggerRefresh } = useApp();
   const { data: c, loading, refetch } = useComplaint(selectedComplaintId);
   const [note, setNote] = useState('');
   const [statusOverride, setStatusOverride] = useState(null);
@@ -50,8 +50,11 @@ const ComplaintDetail = () => {
 
   const handleVote = async (direction) => {
     setVoteLoading(true);
-    try { await complaintsApi.vote(c.id, direction); await refetch(); }
-    catch { /* ignore */ }
+    try {
+      await complaintsApi.vote(c.id, direction);
+      await refetch();
+      if (triggerRefresh) triggerRefresh();
+    } catch { /* ignore */ }
     finally { setVoteLoading(false); }
   };
 
@@ -69,6 +72,7 @@ const ComplaintDetail = () => {
       }
 
       await refetch();
+      if (triggerRefresh) triggerRefresh();
       setNote('');
       setResolutionFiles([]);
     } catch { /* ignore */ }
@@ -80,6 +84,7 @@ const ComplaintDetail = () => {
     try {
       await complaintsApi.update(c.id, { status: 'Escalated' });
       await refetch();
+      if (triggerRefresh) triggerRefresh();
       setStatusOverride('Escalated');
     } catch { /* ignore */ }
     finally { setSaving(false); }

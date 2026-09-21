@@ -77,8 +77,8 @@ const AdminDashboard = () => {
               <span className="ai-stat-lbl">Auto-routed</span>
             </div>
             <div className="ai-stat-mini">
-              <span className="ai-stat-val">{stats.active}</span>
-              <span className="ai-stat-lbl">Active Dispatches</span>
+              <span className="ai-stat-val">{stats.dispatched ?? (stats.active - stats.pending)}</span>
+              <span className="ai-stat-lbl">Field Dispatched</span>
             </div>
             <div className="ai-stat-mini">
               <span className="ai-stat-val">{stats.pending}</span>
@@ -91,7 +91,7 @@ const AdminDashboard = () => {
       {/* ── Stat Grid ── */}
       <div className="stat-grid">
         <StatCard icon={<ClipboardList size={18} strokeWidth={1.75}/>} label="Total Complaints (कुल शिकायतें)" value={statsLoading ? '…' : stats.total}     trend={`${stats.total} total`}   trendUp={stats.total > 0} />
-        <StatCard icon={<Clock         size={18} strokeWidth={1.75}/>} label="Active Dispatches (सक्रिय)"     value={statsLoading ? '…' : stats.active}    trend={stats.active > 0 ? "Field Assigned" : "All Clear"} trendUp={stats.active > 0} />
+        <StatCard icon={<Clock         size={18} strokeWidth={1.75}/>} label="Field Dispatches (सक्रिय कार्य)" value={statsLoading ? '…' : (stats.dispatched ?? (stats.active - stats.pending))} trend={(stats.dispatched ?? (stats.active - stats.pending)) > 0 ? "Field Assigned" : "All Clear"} trendUp={(stats.dispatched ?? (stats.active - stats.pending)) > 0} />
         <StatCard icon={<CheckCircle2  size={18} strokeWidth={1.75}/>} label="Verified Resolved (समाधान)"   value={statsLoading ? '…' : stats.resolved}  trend={stats.total > 0 ? `${Math.round((stats.resolved / stats.total) * 100)}% rate` : "0% rate"} trendUp={stats.resolved > 0} />
         <StatCard icon={<AlertCircle   size={18} strokeWidth={1.75}/>} label="Pending Review (समीक्षा)"     value={statsLoading ? '…' : stats.pending}   trend="Auto-classifying"       trendUp={false} />
         <StatCard icon={<TrendingUp    size={18} strokeWidth={1.75}/>} label="SLA Escalated (उच्चाधिकारी)"  value={statsLoading ? '…' : stats.escalated} trend={stats.escalated > 0 ? "Action required" : "Within SLA"} trendUp={false} accent={stats.escalated > 0} />

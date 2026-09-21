@@ -31,9 +31,12 @@ const DeptDashboard = () => {
   const { data: deptComplaints, loading } = useComplaints({ dept: activeDept });
   const complaints = deptComplaints || [];
 
-  const count = (status) => complaints.filter(c => c.status === status).length;
-  const newCount  = complaints.filter(c => c.status === 'Submitted').length;
-  const escalated = complaints.filter(c => c.status === 'Escalated').length;
+  const newCount          = complaints.filter(c => ['Submitted', 'Under Review'].includes(c.status)).length;
+  const assignedCount     = complaints.filter(c => c.status === 'Assigned').length;
+  const inProgressCount   = complaints.filter(c => c.status === 'In Progress').length;
+  const verificationCount = complaints.filter(c => ['Verification Pending', 'Resolution Submitted'].includes(c.status)).length;
+  const resolvedCount     = complaints.filter(c => ['Resolved', 'Closed'].includes(c.status)).length;
+  const escalated         = complaints.filter(c => c.status === 'Escalated').length;
 
   return (
     <div className="civic-page">
@@ -96,12 +99,12 @@ const DeptDashboard = () => {
 
       {/* ── 6-Metric Stat Grid ── */}
       <div className="stat-grid">
-        <StatCard icon={<FilePlus2     size={18} strokeWidth={1.75}/>} label="New In Ward"    value={loading ? '…' : newCount}                          trend="Needs Review"  trendUp={false} />
-        <StatCard icon={<ClipboardCheck size={18} strokeWidth={1.75}/>} label="Field Assigned" value={loading ? '…' : count('Assigned')}             trend="Active Duty"   trendUp />
-        <StatCard icon={<Timer         size={18} strokeWidth={1.75}/>} label="Under Repair"   value={loading ? '…' : count('In Progress')}          trend="On Site"       trendUp />
-        <StatCard icon={<Hourglass     size={18} strokeWidth={1.75}/>} label="Verification"   value={loading ? '…' : count('Verification Pending')} trend="Proof Uploaded" trendUp={false} />
-        <StatCard icon={<CheckCircle2  size={18} strokeWidth={1.75}/>} label="Resolved"       value={loading ? '…' : count('Resolved')}             trend="+12 this week" trendUp />
-        <StatCard icon={<AlertTriangle size={18} strokeWidth={1.75}/>} label="SLA Breached"   value={loading ? '…' : escalated}                     trend="Escalated"     trendUp={false} accent={escalated > 0} />
+        <StatCard icon={<FilePlus2     size={18} strokeWidth={1.75}/>} label="New / Under Review" value={loading ? '…' : newCount}          trend="Needs Review"     trendUp={false} />
+        <StatCard icon={<ClipboardCheck size={18} strokeWidth={1.75}/>} label="Field Assigned"    value={loading ? '…' : assignedCount}      trend="Active Duty"      trendUp />
+        <StatCard icon={<Timer         size={18} strokeWidth={1.75}/>} label="Under Repair"      value={loading ? '…' : inProgressCount}   trend="On Site"          trendUp />
+        <StatCard icon={<Hourglass     size={18} strokeWidth={1.75}/>} label="Verification"      value={loading ? '…' : verificationCount} trend="Proof Uploaded"   trendUp={false} />
+        <StatCard icon={<CheckCircle2  size={18} strokeWidth={1.75}/>} label="Resolved"          value={loading ? '…' : resolvedCount}     trend="Verified Closed"  trendUp />
+        <StatCard icon={<AlertTriangle size={18} strokeWidth={1.75}/>} label="SLA Breached"      value={loading ? '…' : escalated}         trend="Escalated"        trendUp={false} accent={escalated > 0} />
       </div>
 
       {/* ── Section Tabs ── */}

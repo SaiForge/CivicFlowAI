@@ -16,7 +16,7 @@ const DeptPerformance = () => {
           <thead>
             <tr>
               <th>Department</th>
-              <th>Assigned</th>
+              <th>Total Workload</th>
               <th>In Progress</th>
               <th>Resolved</th>
               <th>Pending</th>
@@ -46,7 +46,7 @@ const DeptPerformance = () => {
           <div key={i} className="dept-mobile-card">
             <div className="dept-mobile-name">{d.dept}</div>
             <div className="dept-mobile-grid">
-              <div><span className="dept-stat-label">Assigned</span><span className="dept-stat-val">{d.assigned}</span></div>
+              <div><span className="dept-stat-label">Total Workload</span><span className="dept-stat-val">{d.assigned}</span></div>
               <div><span className="dept-stat-label">In Progress</span><span className="dept-stat-val">{d.inProgress}</span></div>
               <div><span className="dept-stat-label">Resolved</span><span className="dept-stat-val">{d.resolved}</span></div>
               <div><span className="dept-stat-label">Pending</span><span className="dept-stat-val">{d.pending}</span></div>

@@ -990,16 +990,16 @@ async def submit_complaint(
         )
         db.add(audio_record)
 
-    db.commit()
-
     # Activity + notification with accurate department display
     dept_label = DEPT_NAMES.get(complaint.dept, complaint.dept)
-    _log_activity(db, "new", f"New {complaint.category} complaint submitted",
+    _log_activity(db, "new", f"New {complaint.category} complaint {ticket_id} submitted",
                   complaint_id=ticket_id, dept=dept_label, icon="alert")
     if current_user:
         _notify_user(db, current_user.id,
                      f"Your complaint {ticket_id} has been submitted and is under review.",
                      complaint_id=ticket_id)
+
+    db.commit()
     db.refresh(complaint)
 
     # Invalidate cached stats & broadcast real-time sync event
@@ -1286,14 +1286,16 @@ async def admin_stats(
     if cached is not None:
         return AdminStatsOut(**cached)
 
-    total    = db.query(func.count(Complaint.id)).filter(Complaint.status != "Rejected").scalar() or 0
-    active   = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(ACTIVE_STATUSES)).scalar() or 0
-    resolved = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(RESOLVED_STATUSES)).scalar() or 0
-    pending  = db.query(func.count(Complaint.id)).filter(Complaint.status == "Under Review").scalar() or 0
-    escalated= db.query(func.count(Complaint.id)).filter(Complaint.status == "Escalated").scalar() or 0
-    critical = db.query(func.count(Complaint.id)).filter(Complaint.priority == "Critical", Complaint.status != "Rejected").scalar() or 0
+    total      = db.query(func.count(Complaint.id)).filter(Complaint.status != "Rejected").scalar() or 0
+    active     = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(ACTIVE_STATUSES)).scalar() or 0
+    resolved   = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(RESOLVED_STATUSES)).scalar() or 0
+    pending    = db.query(func.count(Complaint.id)).filter(Complaint.status.in_({"Submitted", "Under Review"})).scalar() or 0
+    dispatched = db.query(func.count(Complaint.id)).filter(Complaint.status.in_({"Assigned", "In Progress", "Resolution Submitted", "Verification Pending"})).scalar() or 0
+    escalated  = db.query(func.count(Complaint.id)).filter(Complaint.status == "Escalated").scalar() or 0
+    critical   = db.query(func.count(Complaint.id)).filter(Complaint.priority == "Critical", Complaint.status != "Rejected").scalar() or 0
     res = AdminStatsOut(total=total, active=active, resolved=resolved,
-                         pending=pending, escalated=escalated, critical=critical)
+                         pending=pending, escalated=escalated, critical=critical,
+                         dispatched=dispatched)
     await set_cache("civicflow:stats:admin", res.model_dump(), ttl=60)
     return res
 
@@ -1349,7 +1351,7 @@ async def dept_performance(db: Session = Depends(get_db)):
     for dept_id, dept_name in DEPT_NAMES.items():
         base_q = db.query(Complaint).filter(Complaint.dept == dept_id, Complaint.status != "Rejected")
         assigned   = base_q.count()
-        in_prog    = base_q.filter(Complaint.status == "In Progress").count()
+        in_prog    = base_q.filter(Complaint.status.in_({"In Progress", "Assigned", "Resolution Submitted", "Verification Pending"})).count()
         resolved   = base_q.filter(Complaint.status.in_(RESOLVED_STATUSES)).count()
         pending    = base_q.filter(Complaint.status.in_({"Submitted", "Under Review"})).count()
         escalated  = base_q.filter(Complaint.status == "Escalated").count()
@@ -1456,7 +1458,7 @@ async def area_stats(db: Session = Depends(get_db),
 
     active   = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(ACTIVE_STATUSES)).scalar() or 0
     resolved = db.query(func.count(Complaint.id)).filter(Complaint.status.in_(RESOLVED_STATUSES)).scalar() or 0
-    in_prog  = db.query(func.count(Complaint.id)).filter(Complaint.status == "In Progress").scalar() or 0
+    in_prog  = db.query(func.count(Complaint.id)).filter(Complaint.status.in_({"In Progress", "Assigned", "Resolution Submitted", "Verification Pending"})).scalar() or 0
     support  = db.query(func.coalesce(func.sum(Complaint.support_count), 0)).scalar() or 0
     res = {
         "activeNearby": active,
@@ -1661,4 +1663,5 @@ def _find_or_create_incident(db: Session, complaint: Complaint, agent_data: Dict
     db.commit()
     _log_activity(db, "new", f"New incident {inc_id} created for {complaint.category}",
                   complaint_id=complaint.id, dept=DEPT_NAMES.get(complaint.dept, complaint.dept), icon="alert")
+    db.commit()
     return inc_id

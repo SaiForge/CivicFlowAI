@@ -121,13 +121,31 @@ const CitizenDashboard = () => {
   };
 
   // Real API data
-  const { data: allComplaints, loading: complaintsLoading } = useComplaints(
-    currentUser?.id ? { citizen_id: currentUser.id } : {}
-  );
+  const { data: allComplaints, loading: complaintsLoading } = useComplaints({ limit: 100 });
   const { data: areaStats, loading: statsLoading } = useAreaStats();
   const { data: notifications } = useNotifications();
 
-  const myComplaints = allComplaints || [];
+  const localTicketIds = React.useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('civicflow_user_tickets') || '[]');
+    } catch { return []; }
+  }, [allComplaints]);
+
+  const myComplaints = React.useMemo(() => {
+    if (!allComplaints) return [];
+    if (currentUser?.id) {
+      return allComplaints.filter(c =>
+        c.citizenId === String(currentUser.id) ||
+        Number(c.citizenId) === Number(currentUser.id) ||
+        localTicketIds.includes(c.id)
+      );
+    }
+    if (localTicketIds.length > 0) {
+      return allComplaints.filter(c => localTicketIds.includes(c.id));
+    }
+    return [];
+  }, [allComplaints, currentUser, localTicketIds]);
+
   const unreadCount  = (notifications || []).filter(n => !n.read).length;
   const stats = areaStats || { activeNearby: 0, resolvedNearby: 0, inProgress: 0, communityReports: 0 };
 
