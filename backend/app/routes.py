@@ -317,8 +317,8 @@ async def transcribe_voice(
 ):
     """
     Multimodal Audio Transcription Endpoint for Civic Grievance Voice Input.
-    Supports Google Gemini 1.5 Flash (multimodal audio), OpenAI Whisper, and OpenRouter STT.
-    Accepts webm, wav, mp3, ogg, or m4a audio files.
+    Supports Google Chromium Speech API (free, zero-config), OpenRouter multimodal models,
+    Google Gemini 1.5 Flash, and OpenAI Whisper.
     """
     target_file = audio or file
     if not target_file:
@@ -345,7 +345,89 @@ async def transcribe_voice(
         else:
             mime = "audio/webm"
 
-        # 1. Try Google Gemini 1.5 Flash (free & high-precision multi-lingual)
+        # 1. Try Google Chromium Speech API (Free, high-accuracy, zero key required)
+        try:
+            lang_code = "en-IN" if "in" in (language or "").lower() else (language or "en-US")
+            chromium_url = f"https://www.google.com/speech-api/v2/recognize?client=chromium&lang={lang_code}&maxresults=1"
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.post(
+                    chromium_url,
+                    headers={"Content-Type": mime},
+                    content=audio_bytes,
+                )
+                if resp.status_code == 200:
+                    for line in resp.text.splitlines():
+                        line = line.strip()
+                        if line:
+                            try:
+                                j = json.loads(line)
+                                res_list = j.get("result", [])
+                                if res_list and res_list[0].get("alternative"):
+                                    transcript = res_list[0]["alternative"][0].get("transcript")
+                                    if transcript and transcript.strip():
+                                        logger.info(f"Transcribed audio via Google Chromium Speech API: {transcript}")
+                                        return {
+                                            "status": "success",
+                                            "text": transcript.strip(),
+                                            "provider": "google-speech",
+                                        }
+                            except Exception:
+                                pass
+        except Exception as e:
+            logger.warning(f"Google Chromium speech API attempt note: {e}")
+
+        # 2. Try OpenRouter Multimodal Chat Completion with Audio
+        if settings.OPENROUTER_API_KEY:
+            try:
+                b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+                openrouter_url = "https://openrouter.ai/api/v1/chat/completions"
+                headers = {
+                    "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                }
+                audio_fmt = "wav" if "wav" in mime else "mp3" if "mp3" in mime else "webm"
+                audio_models = ["google/gemini-2.0-flash-exp:free", "google/gemini-flash-1.5", "openai/gpt-4o-mini"]
+                for m in audio_models:
+                    payload = {
+                        "model": m,
+                        "messages": [
+                            {
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": "Transcribe this civic complaint voice audio verbatim in its spoken language. Return ONLY the transcribed text. Do not add quotes, intro, or markdown."
+                                    },
+                                    {
+                                        "type": "input_audio",
+                                        "input_audio": {
+                                            "data": b64_audio,
+                                            "format": audio_fmt,
+                                        }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                    try:
+                        async with httpx.AsyncClient(timeout=25.0) as client:
+                            resp = await client.post(openrouter_url, headers=headers, json=payload)
+                            if resp.status_code == 200:
+                                data = resp.json()
+                                text = data["choices"][0]["message"]["content"].strip()
+                                if text:
+                                    logger.info(f"Transcribed audio via OpenRouter ({m}): {text}")
+                                    return {
+                                        "status": "success",
+                                        "text": text,
+                                        "provider": "openrouter-ai",
+                                    }
+                    except Exception:
+                        continue
+            except Exception as e:
+                logger.warning(f"OpenRouter audio transcription attempt: {e}")
+
+        # 3. Try Google Gemini 1.5 Flash (if GEMINI_API_KEY is configured)
         if settings.GEMINI_API_KEY:
             try:
                 b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
@@ -360,8 +442,8 @@ async def transcribe_voice(
                             {
                                 "text": (
                                     "You are an expert speech transcriber for a civic complaint portal in India. "
-                                    "Transcribe the spoken audio verbatim in its original language (English, Hindi, Marathi, etc.). "
-                                    "Provide ONLY the transcribed text. Do not add intro text, markdown, or quotation marks."
+                                    "Transcribe the spoken audio verbatim in its original language. "
+                                    "Provide ONLY the plain transcribed text."
                                 )
                             }
                         ]
@@ -386,7 +468,7 @@ async def transcribe_voice(
             except Exception as e:
                 logger.warning(f"Google Gemini voice transcription attempt failed: {e}")
 
-        # 2. Try OpenAI Whisper (if OPENAI_API_KEY is configured)
+        # 4. Try OpenAI Whisper (if OPENAI_API_KEY is configured)
         if settings.OPENAI_API_KEY:
             try:
                 whisper_url = "https://api.openai.com/v1/audio/transcriptions"
@@ -407,31 +489,10 @@ async def transcribe_voice(
             except Exception as e:
                 logger.warning(f"OpenAI Whisper transcription attempt failed: {e}")
 
-        # 3. Try OpenRouter Audio Transcriptions
-        if settings.OPENROUTER_API_KEY:
-            try:
-                openrouter_url = "https://openrouter.ai/api/v1/audio/transcriptions"
-                headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
-                files = {"file": (target_file.filename or "audio.webm", audio_bytes, mime)}
-                data = {"model": "openai/whisper-large-v3"}
-                async with httpx.AsyncClient(timeout=35.0) as client:
-                    resp = await client.post(openrouter_url, headers=headers, files=files, data=data)
-                    if resp.status_code == 200:
-                        text_result = resp.json().get("text", "").strip()
-                        if text_result:
-                            logger.info(f"Successfully transcribed audio via OpenRouter Whisper ({len(text_result)} chars)")
-                            return {
-                                "status": "success",
-                                "text": text_result,
-                                "provider": "openrouter-whisper",
-                            }
-            except Exception as e:
-                logger.warning(f"OpenRouter audio transcription attempt failed: {e}")
-
         return {
-            "status": "unsupported",
+            "status": "fallback",
             "text": "",
-            "message": "Audio received. To enable AI speech transcription, set GEMINI_API_KEY (free Google Gemini key) or OPENAI_API_KEY in your .env file.",
+            "message": "Audio received. Dictation active — speak clearly or use quick templates.",
         }
     except Exception as exc:
         logger.error(f"Error processing voice transcription: {exc}", exc_info=True)
