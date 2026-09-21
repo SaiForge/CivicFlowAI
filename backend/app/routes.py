@@ -533,53 +533,84 @@ auth_router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 @auth_router.post("/login", response_model=AuthResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    ident = payload.email.strip()
-    user = (
-        db.query(User)
-        .filter(
-            (func.lower(User.email) == ident.lower())
-            | (func.lower(User.email) == f"{ident.lower()}@civicflow.gov")
-            | (func.lower(User.name) == ident.lower())
+    try:
+        ident = payload.email.strip()
+        user = (
+            db.query(User)
+            .filter(
+                (func.lower(User.email) == ident.lower())
+                | (func.lower(User.email) == f"{ident.lower()}@civicflow.gov")
+                | (func.lower(User.name) == ident.lower())
+            )
+            .first()
         )
-        .first()
-    )
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    token = create_access_token({"sub": user.email, "role": user.role})
-    return AuthResponse(
-        token=token,
-        user={
-            "id": user.id, "name": user.name, "email": user.email,
-            "role": user.role, "ward": user.ward, "dept": user.dept,
-        },
-    )
+
+        # If demo user requested on an unseeded/fresh DB, auto-seed idempotently on demand
+        if not user and ident.lower() in ("citizen", "citizen@civicflow.gov", "dept", "dept@civicflow.gov", "admin", "admin@civicflow.gov"):
+            try:
+                from app.main import _seed_demo_data
+                _seed_demo_data()
+                user = (
+                    db.query(User)
+                    .filter(
+                        (func.lower(User.email) == ident.lower())
+                        | (func.lower(User.email) == f"{ident.lower()}@civicflow.gov")
+                        | (func.lower(User.name) == ident.lower())
+                    )
+                    .first()
+                )
+            except Exception as seed_err:
+                logger.warning(f"On-demand seeding notice: {seed_err}")
+
+        if not user or not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid credentials. Please check your username and password.")
+
+        token = create_access_token({"sub": user.email, "role": user.role})
+        return AuthResponse(
+            token=token,
+            user={
+                "id": user.id, "name": user.name, "email": user.email,
+                "role": user.role, "ward": user.ward, "dept": user.dept,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Authentication exception during login for '{payload.email}': {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Authentication server error: {str(exc)}")
 
 
 @auth_router.post("/register", response_model=AuthResponse, status_code=201)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(func.lower(User.email) == payload.email.strip().lower()).first():
-        raise HTTPException(status_code=409, detail="Email already registered")
-    # Public self-registration strictly restricted to citizen role for security
-    role = "citizen"
-    user = User(
-        name=payload.name.strip(),
-        email=payload.email.strip().lower(),
-        password_hash=hash_password(payload.password),
-        role=role,
-        ward=payload.ward or "Ward 14, Central Zone",
-        dept=None,
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    token = create_access_token({"sub": user.email, "role": user.role})
-    return AuthResponse(
-        token=token,
-        user={
-            "id": user.id, "name": user.name, "email": user.email,
-            "role": user.role, "ward": user.ward, "dept": user.dept,
-        },
-    )
+    try:
+        if db.query(User).filter(func.lower(User.email) == payload.email.strip().lower()).first():
+            raise HTTPException(status_code=409, detail="Email already registered")
+        # Public self-registration strictly restricted to citizen role for security
+        role = "citizen"
+        user = User(
+            name=payload.name.strip(),
+            email=payload.email.strip().lower(),
+            password_hash=hash_password(payload.password),
+            role=role,
+            ward=payload.ward or "Ward 14, Central Zone",
+            dept=None,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+        token = create_access_token({"sub": user.email, "role": user.role})
+        return AuthResponse(
+            token=token,
+            user={
+                "id": user.id, "name": user.name, "email": user.email,
+                "role": user.role, "ward": user.ward, "dept": user.dept,
+            },
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Registration error for '{payload.email}': {exc}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Registration server error: {str(exc)}")
 
 
 @auth_router.get("/me", response_model=UserOut)

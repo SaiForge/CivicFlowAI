@@ -40,15 +40,24 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
+    raw_exp = getattr(settings, "ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
+    try:
+        expire_minutes = int(raw_exp)
+    except Exception:
+        expire_minutes = 1440
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=expire_minutes))
     to_encode["exp"] = expire
-    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    secret = getattr(settings, "SECRET_KEY", "change_me_in_production_civicflow_2024")
+    algorithm = getattr(settings, "ALGORITHM", "HS256")
+    return jwt.encode(to_encode, secret, algorithm=algorithm)
 
 
 def decode_token(token: str) -> Optional[dict]:
     try:
-        return jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-    except JWTError:
+        secret = getattr(settings, "SECRET_KEY", "change_me_in_production_civicflow_2024")
+        algorithm = getattr(settings, "ALGORITHM", "HS256")
+        return jwt.decode(token, secret, algorithms=[algorithm])
+    except (JWTError, Exception):
         return None
 
 
