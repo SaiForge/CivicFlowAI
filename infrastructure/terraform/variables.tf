@@ -90,7 +90,7 @@ variable "openrouter_api_key" {
 }
 
 variable "openrouter_model_name" {
-  description = "Model identifier for OpenRouter (e.g., thinkingmachines/inkling-small:free)"
+  description = "Model identifier for OpenRouter (e.g., inclusionai/ling-3.0-flash-vl:free)"
   type        = string
-  default     = "thinkingmachines/inkling-small:free"
+  default     = "inclusionai/ling-3.0-flash-vl:free"
 }

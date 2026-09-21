@@ -116,6 +116,84 @@ class VerificationAgent:
         else:
             checks_passed.append(f"Workflow SLA {sla_hours}h verified")
 
+        # 8. Visual Evidence vs Category Alignment (Benign Misclassification)
+        if evidence.get("category_mismatch") and evidence.get("detected_issue") and evidence.get("text_image_consistent", True):
+            detected = evidence.get("detected_issue")
+            claimed = issue.get("issue_type")
+            sugg_cat = evidence.get("suggested_category") or "Road"
+            if detected != claimed:
+                if "issue" not in failed_agents:
+                    failed_agents.append("issue")
+                if "routing" not in failed_agents:
+                    failed_agents.append("routing")
+                feedback_dict["issue"] = (
+                    f"Visual category mismatch: Photographic evidence clearly shows '{detected}', "
+                    f"contradicting claimed '{claimed}'. Rectify category/issue_type to '{detected}'."
+                )
+                feedback_dict["routing"] = (
+                    f"Visual category mismatch: Re-route complaint to the department responsible for '{sugg_cat}'."
+                )
+        else:
+            checks_passed.append("Visual evidence alignment with issue category verified")
+
+        # 9. Cross-Modal Contradiction / Incoherent Evidence Gate (MUST REJECT)
+        text_consistent = evidence.get("text_image_consistent", True)
+        contradiction = evidence.get("cross_modal_contradiction", False)
+
+        # Check citizen domains vs image domain
+        text_raw = (input_data.get("text") or "").lower()
+        claimed_cat = (input_data.get("category") or "").lower()
+        raw_cat = (input_data.get("raw_category") or "").lower()
+        claimed_type = (issue.get("issue_type") or "").lower()
+        combined_claim = f"{text_raw} {claimed_cat} {raw_cat} {claimed_type}".lower()
+
+        detected_issue = (evidence.get("detected_issue") or "").lower()
+        visual_findings = (evidence.get("visual_findings") or "").lower()
+        discs = " ".join(evidence.get("discrepancies", [])).lower()
+        combined_image = f"{detected_issue} {visual_findings} {discs}".lower()
+
+        defect_domains = {
+            "road": ["road", "pothole", "asphalt", "crater", "pavement", "broken road", "tar"],
+            "water": ["water", "leak", "pipe", "pipeline", "drinking water", "tap leak", "burst pipe", "supply", "jal"],
+            "waste": ["garbage", "trash", "waste", "dump", "debris", "litter", "rubbish", "refuse", "sanitation"],
+            "streetlight": ["streetlight", "street light", "lamp", "utility pole", "wiring", "light fixture", "electrical wire", "pole", "light"],
+            "drainage": ["drain", "sewage", "gutter", "overflow", "manhole", "sewer", "drainage"],
+        }
+
+        # Determine domains present in citizen's claim
+        citizen_domains = set()
+        for dom, kws in defect_domains.items():
+            if any(kw in combined_claim for kw in kws):
+                citizen_domains.add(dom)
+
+        # Determine domains present in photo evidence
+        image_domains = set()
+        for dom, kws in defect_domains.items():
+            if any(kw in combined_image for kw in kws):
+                image_domains.add(dom)
+
+        # Contradiction triggers if:
+        # - Evidence agent explicitly flagged it, or
+        # - text and image have disjoint defect domains (e.g. text/cat is road/water, photo is streetlight)
+        if citizen_domains and image_domains and not (citizen_domains & image_domains):
+            contradiction = True
+            text_consistent = False
+
+        if not text_consistent or contradiction:
+            state["cross_modal_contradiction"] = True
+            if "evidence" not in failed_agents:
+                failed_agents.append("evidence")
+            if "verification" not in failed_agents:
+                failed_agents.append("verification")
+            feedback_dict["evidence"] = (
+                f"FATAL CONTRADICTION: Citizen reported grievance domain '{', '.join(citizen_domains) or 'other'}', "
+                f"but photographic evidence clearly depicts '{', '.join(image_domains) or detected_issue}'. "
+                f"Photographic evidence does not corroborate reported grievance."
+            )
+            feedback_dict["verification"] = (
+                f"FATAL CONTRADICTION: Photographic evidence directly contradicts reported grievance description. Submission rejected."
+            )
+
         return {
             "approved": len(failed_agents) == 0,
             "failed_agents": failed_agents,

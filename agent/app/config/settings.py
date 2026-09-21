@@ -30,7 +30,7 @@ try:
         GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
 
         OPENROUTER_API_KEY: str = ""
-        OPENROUTER_MODEL_NAME: str = "thinkingmachines/inkling-small:free"
+        OPENROUTER_MODEL_NAME: str = "inclusionai/ling-3.0-flash-vl:free"
         OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
 
         AGENT_DELAY_SECONDS: float = 5.0
@@ -52,7 +52,7 @@ except ImportError:
             GOOGLE_API_KEY: str = ""
             GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
             OPENROUTER_API_KEY: str = ""
-            OPENROUTER_MODEL_NAME: str = "thinkingmachines/inkling-small:free"
+            OPENROUTER_MODEL_NAME: str = "inclusionai/ling-3.0-flash-vl:free"
             OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
             AGENT_DELAY_SECONDS: float = 5.0
             MAX_RETRIES: int = 2

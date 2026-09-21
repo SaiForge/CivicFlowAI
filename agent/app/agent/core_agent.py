@@ -96,6 +96,23 @@ class ManagerAgent:
         pipeline_order = ["issue", "evidence", "severity", "routing", "incident", "workflow"]
 
         while not verification_result.get("approved", False) and retries < self.max_retries:
+            # Fatal unrecoverable contradictions (e.g. photo of streetlight vs road damage report) must NOT retry.
+            # Retrying could falsely mutate the citizen's complaint to match fraudulent or mismatched evidence.
+            ev_check = state.get("evidence", {})
+            fb_check = str(verification_result.get("feedback", {})).lower()
+            if (
+                ev_check.get("cross_modal_contradiction", False)
+                or not ev_check.get("text_image_consistent", True)
+                or state.get("cross_modal_contradiction", False)
+                or "fatal contradiction" in fb_check
+                or "contradiction" in fb_check
+            ):
+                logger.warning(
+                    f"[ManagerAgent] Fatal cross-modal contradiction detected for ticket {ticket_id}. "
+                    "Halting retry cascade immediately: grievance is rejected."
+                )
+                break
+
             retries += 1
             failed_agents = verification_result.get("failed_agents", [])
             logger.warning(
@@ -146,7 +163,28 @@ class ManagerAgent:
             state["retry_count"] = retries
 
         # 4. Final Status Determination
-        if verification_result.get("approved", False):
+        evidence_data = state.get("evidence", {})
+        fb_all = str(verification_result.get("feedback", {})).lower()
+        is_contradiction = (
+            evidence_data.get("cross_modal_contradiction", False)
+            or not evidence_data.get("text_image_consistent", True)
+            or state.get("cross_modal_contradiction", False)
+            or "fatal contradiction" in fb_all
+            or "contradiction" in fb_all
+            or ("evidence" in verification_result.get("failed_agents", []) and "verification" in verification_result.get("failed_agents", []))
+        )
+        rejection_reason = None
+        if is_contradiction:
+            final_status = "Rejected"
+            verification_result["approved"] = False
+            rejection_reason = (
+                f"Photographic evidence ({evidence_data.get('detected_issue', 'attached image')}) "
+                f"does not corroborate the reported grievance description and category."
+            )
+            verification_result["rejection_reason"] = rejection_reason
+            verification_result["reasoning"] = f"Verification REJECTED: {rejection_reason}"
+            logger.warning(f"=== [ManagerAgent] Ticket {ticket_id} REJECTED -> Status: {final_status} ({rejection_reason}) ===")
+        elif verification_result.get("approved", False):
             final_status = "Submitted"
             logger.info(f"=== [ManagerAgent] Ticket {ticket_id} APPROVED -> Status: {final_status} ===")
         else:
@@ -162,17 +200,54 @@ class ManagerAgent:
         incident_data = state.get("incident", {})
         workflow_data = state.get("workflow", {})
 
+        # ── Visual Truth Rectification ─────────────────────────────
+        # Only apply rectification for benign category misclicks where text and image are consistent.
+        # NEVER rectify when there is an irreconcilable cross-modal contradiction!
+        category_rectified = False
+        original_issue = issue_data.get("issue_type")
+        if not is_contradiction and evidence_data.get("category_mismatch") and evidence_data.get("detected_issue"):
+            rectified_issue = evidence_data.get("detected_issue")
+            rectified_cat = evidence_data.get("suggested_category") or "Road"
+            logger.warning(
+                f"[ManagerAgent] Visual Truth Override: Rectifying ticket from '{original_issue}' "
+                f"to '{rectified_issue}' ({rectified_cat}) based on photographic evidence."
+            )
+            issue_data["issue_type"] = rectified_issue
+            issue_data["reasoning"] = f"Visual ground truth: {evidence_data.get('visual_findings', 'Photographic evidence depicts ' + rectified_issue)}"
+            category_rectified = True
+
+            # Re-map department
+            from app.agent.tools.department_rules import DEPARTMENT_ROUTING_RULES
+            dept_rule = DEPARTMENT_ROUTING_RULES.get(rectified_issue, {})
+            if dept_rule and dept_rule.get("primary_department"):
+                routing_data["primary_department"] = dept_rule.get("primary_department")
+                routing_data["reasoning"] = f"Re-routed to {routing_data['primary_department']} to address visually confirmed {rectified_issue}."
+
+            self.long_term.log_action(
+                ticket_id=ticket_id,
+                agent_name="evidence_rectification",
+                attempt=retries,
+                output={"rectified_issue": rectified_issue, "rectified_category": rectified_cat},
+                reasoning=f"Category rectified from '{original_issue}' to '{rectified_issue}' based on verified visual evidence.",
+                success=True,
+                input_summary="Visual ground truth category rectification",
+            )
+
         now_str = datetime.utcnow().isoformat()
         audit_trail = self.long_term.get_audit_trail(ticket_id)
 
         final_ticket = {
             "ticket_id": ticket_id,
             "issue_type": issue_data.get("issue_type") or incident_data.get("category") or "General Civic Issue",
+            "category": evidence_data.get("suggested_category") if category_rectified else None,
+            "category_rectified": category_rectified,
+            "original_claimed_issue": original_issue if category_rectified else None,
             "description": incident_data.get("description") or input_dict.get("text") or "No description",
             "severity": severity_data.get("severity") or incident_data.get("priority") or "Medium",
             "department": routing_data.get("primary_department") or incident_data.get("department") or "General Municipal Office",
             "location": input_dict.get("location"),
             "status": final_status,
+            "rejection_reason": rejection_reason,
             "created_at": now_str,
             "verification": verification_result,
             "retry_count": retries,

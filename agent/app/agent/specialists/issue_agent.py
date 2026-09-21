@@ -19,6 +19,17 @@ class IssueAgent:
             complaint_input = state.get("input", {})
             text = complaint_input.get("text") or "No textual description provided."
             image_b64 = complaint_input.get("image_base64")
+            claimed_cat = complaint_input.get("category") or complaint_input.get("raw_category") or "Not specified"
+
+            # Check if citizen provided descriptive text.
+            # If so, intake agent classifies the citizen's reported claim from words.
+            # Only use image for intake if text is missing or generic (e.g. 'see photo').
+            text_clean = text.strip()
+            is_generic = any(
+                phrase in text_clean.lower()
+                for phrase in ["see photo", "see image", "attached photo", "attached image", "photo attached", "image attached"]
+            )
+            use_image_for_intake = (len(text_clean) < 5 or is_generic) and bool(image_b64)
 
             prompt_parts = []
             if feedback:
@@ -26,16 +37,17 @@ class IssueAgent:
                     f"NOTE: Your previous attempt was rejected. Feedback: {feedback}. Please correct this in your new response.\n"
                 )
 
-            prompt_parts.append(f"Complaint Text: {text}")
+            prompt_parts.append(f"Reported Category: {claimed_cat}")
+            prompt_parts.append(f"Citizen Complaint Text: {text}")
             if image_b64:
-                prompt_parts.append("[Citizen has also attached an image]")
+                prompt_parts.append("[Citizen has also uploaded photo evidence for verification]")
 
             user_prompt = "\n".join(prompt_parts)
 
             response = await self.llm_client.complete(
                 system_prompt=ISSUE_AGENT_SYSTEM_PROMPT,
                 user_prompt=user_prompt,
-                image_b64=image_b64,
+                image_b64=image_b64 if use_image_for_intake else None,
                 temperature=0.1,
             )
 

@@ -68,7 +68,7 @@ services:
     environment:
       - LLM_PROVIDER=${LLM_PROVIDER:-openrouter}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
-      - OPENROUTER_MODEL_NAME=${OPENROUTER_MODEL_NAME:-thinkingmachines/inkling-small:free}
+      - OPENROUTER_MODEL_NAME=${OPENROUTER_MODEL_NAME:-inclusionai/ling-3.0-flash-vl:free}
       - OPENROUTER_BASE_URL=${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
       - AGENT_DELAY_SECONDS=${AGENT_DELAY_SECONDS:-5.0}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
@@ -83,6 +83,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./agent:/agent
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     networks:
       - civicnet
     depends_on:
@@ -121,6 +122,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       - ./backend:/backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload
     depends_on:
       postgres:
         condition: service_healthy

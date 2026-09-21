@@ -33,7 +33,11 @@ class EvidenceResult(BaseModel):
     text_image_consistent: bool = Field(..., description="Whether text and image agree")
     visual_findings: str = Field(..., description="What image shows or 'no image provided'")
     discrepancies: List[str] = Field(default_factory=list)
-    reasoning: str = Field(..., description="Explanation of grounding score")
+    detected_issue: Optional[str] = Field(None, description="Actual physical issue detected in image (e.g. pothole, garbage_dump)")
+    category_mismatch: bool = Field(False, description="True if image shows a different issue than claimed category")
+    suggested_category: Optional[str] = Field(None, description="Corrected category based on visual ground truth")
+    cross_modal_contradiction: bool = Field(False, description="True if citizen text and photo evidence describe contradictory civic defects")
+    reasoning: str = Field(..., description="Explanation of grounding score and visual consistency")
 
 class SeverityFactorBreakdown(BaseModel):
     safety_risk: float = Field(0.0, ge=0.0, le=100.0)
@@ -109,6 +113,10 @@ class TicketOutput(BaseModel):
     routing_confidence: Optional[float] = None
     grounding_score: Optional[float] = None
     agent_thoughts: Optional[Dict[str, Any]] = None
+    category: Optional[str] = None
+    category_rectified: Optional[bool] = False
+    original_claimed_issue: Optional[str] = None
+    rejection_reason: Optional[str] = None
 
 class GeocodeRequest(BaseModel):
     query: str = Field(..., description="Address, area, or landmark string")

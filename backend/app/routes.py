@@ -12,6 +12,7 @@ import math
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
+import json
 import httpx
 from fastapi import (
     APIRouter, Depends, File, Form, HTTPException,
@@ -65,6 +66,110 @@ DEPT_NAMES = {
 ACTIVE_STATUSES = {"Submitted", "Under Review", "Assigned", "In Progress",
                    "Resolution Submitted", "Verification Pending", "Escalated"}
 RESOLVED_STATUSES = {"Resolved", "Closed"}
+
+
+def _is_meaningful_text(text: str) -> tuple[bool, str]:
+    """
+    Validates that a citizen's complaint description is meaningful and not keyboard-smash/gibberish.
+    Catches inputs like 'asdsadssdd', 'aaaaaa', 'qwertyuiop', or zero-vocabulary strings.
+    """
+    clean = text.strip()
+    if len(clean) < 10:
+        return False, "Please provide a meaningful description of the issue (at least 10 characters)."
+
+    alpha_chars = [c.lower() for c in clean if c.isalpha()]
+    if len(alpha_chars) < 6:
+        return False, "Description must contain meaningful explanatory text, not just symbols or numbers."
+
+    # 1. Distinct character vocabulary diversity
+    unique_chars = set(alpha_chars)
+    if len(unique_chars) < 4:
+        return False, f"Description '{clean}' has insufficient vocabulary diversity (appears to be random characters)."
+
+    # 2. Vowel ratio check (natural human language in Latin script has 12%-85% vowels)
+    vowels = set("aeiou")
+    vowel_count = sum(1 for c in alpha_chars if c in vowels)
+    vowel_ratio = vowel_count / len(alpha_chars)
+    if vowel_ratio < 0.12 or vowel_ratio > 0.85:
+        return False, f"Description appears to be random or invalid text ('{clean}'). Please describe the issue in clear words."
+
+    # 3. Repeated short n-gram spam (e.g. 'asdsadssdd' -> repeating 'sd', 'ds', 'sa')
+    s = "".join(alpha_chars)
+    for n in (2, 3):
+        ngrams = [s[i : i + n] for i in range(len(s) - n + 1)]
+        if ngrams:
+            from collections import Counter
+            counts = Counter(ngrams)
+            most_common, freq = counts.most_common(1)[0]
+            if freq >= 4 and (freq * n) / len(s) > 0.65:
+                return False, f"Description contains repetitive keyboard patterns ('{clean}'). Please enter a real explanation."
+
+    # 4. Standard keyboard walk patterns
+    smashes = ["asdfgh", "qwerty", "zxcvbn", "lkjhgf", "poiuyt", "mnbvcx", "123456", "asdsad"]
+    s_lower = s.lower()
+    for smash in smashes:
+        if smash in s_lower:
+            return False, f"Description contains keyboard walk/smash patterns ('{smash}'). Please describe the actual civic issue."
+
+    return True, ""
+
+
+def _extract_exif_capture_time(image_bytes: bytes) -> Optional[datetime]:
+    """
+    Extracts the image capture timestamp from EXIF metadata.
+    Supports JPEG, PNG, TIFF, and HEIC.
+    Checks DateTimeOriginal (36867), DateTimeDigitized (36868), and DateTime (306).
+    Falls back to binary header regex scan if Pillow is unavailable.
+    """
+    # 1. Try Pillow getexif / get_ifd
+    try:
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        exif = img.getexif()
+        if exif:
+            for tag_id in (36867, 36868, 306):
+                val = exif.get(tag_id)
+                if val and isinstance(val, str):
+                    for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y:%m:%d"):
+                        try:
+                            return datetime.strptime(val.strip(), fmt)
+                        except ValueError:
+                            pass
+            if hasattr(exif, "get_ifd"):
+                try:
+                    exif_ifd = exif.get_ifd(0x8769)
+                    for tag_id in (36867, 36868, 306):
+                        val = exif_ifd.get(tag_id)
+                        if val and isinstance(val, str):
+                            for fmt in ("%Y:%m:%d %H:%M:%S", "%Y-%m-%d %H:%M:%S", "%Y:%m:%d"):
+                                try:
+                                    return datetime.strptime(val.strip(), fmt)
+                                except ValueError:
+                                    pass
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 2. Fast binary regex scan on header metadata (first 64KB)
+    try:
+        header = image_bytes[:65536]
+        matches = re.findall(
+            rb'(19\d\d|20\d\d)[:/-](0[1-9]|1[0-2])[:/-](0[1-9]|[12]\d|3[01])\s+([01]\d|2[0-3]):([0-5]\d):([0-5]\d)',
+            header,
+        )
+        for m in matches:
+            date_str = b"-".join(m[0:3]).decode("ascii") + " " + b":".join(m[3:6]).decode("ascii")
+            try:
+                dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+                if 2000 <= dt.year <= 2030:
+                    return dt
+            except ValueError:
+                continue
+    except Exception:
+        pass
+
+    return None
 
 
 def _complaint_to_dict(c: Complaint, db: Session) -> Dict[str, Any]:
@@ -204,6 +309,139 @@ async def stream_live_events():
     )
 
 
+@router.post("/api/voice/transcribe", tags=["Voice"])
+async def transcribe_voice(
+    audio: Optional[UploadFile] = File(None),
+    file: Optional[UploadFile] = File(None),
+    language: Optional[str] = Form("en-IN"),
+):
+    """
+    Multimodal Audio Transcription Endpoint for Civic Grievance Voice Input.
+    Supports Google Gemini 1.5 Flash (multimodal audio), OpenAI Whisper, and OpenRouter STT.
+    Accepts webm, wav, mp3, ogg, or m4a audio files.
+    """
+    target_file = audio or file
+    if not target_file:
+        raise HTTPException(status_code=400, detail="No audio file provided in request.")
+
+    try:
+        audio_bytes = await target_file.read()
+        if not audio_bytes or len(audio_bytes) < 100:
+            return {
+                "status": "empty",
+                "text": "",
+                "message": "Audio recording was too short or empty.",
+            }
+
+        content_type = target_file.content_type or "audio/webm"
+        if "webm" in content_type:
+            mime = "audio/webm"
+        elif "wav" in content_type:
+            mime = "audio/wav"
+        elif "mp3" in content_type or "mpeg" in content_type:
+            mime = "audio/mp3"
+        elif "ogg" in content_type:
+            mime = "audio/ogg"
+        else:
+            mime = "audio/webm"
+
+        # 1. Try Google Gemini 1.5 Flash (free & high-precision multi-lingual)
+        if settings.GEMINI_API_KEY:
+            try:
+                b64_audio = base64.b64encode(audio_bytes).decode("utf-8")
+                gemini_url = (
+                    f"https://generativelanguage.googleapis.com/v1beta/models/"
+                    f"gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+                )
+                payload = {
+                    "contents": [{
+                        "parts": [
+                            {"inline_data": {"mime_type": mime, "data": b64_audio}},
+                            {
+                                "text": (
+                                    "You are an expert speech transcriber for a civic complaint portal in India. "
+                                    "Transcribe the spoken audio verbatim in its original language (English, Hindi, Marathi, etc.). "
+                                    "Provide ONLY the transcribed text. Do not add intro text, markdown, or quotation marks."
+                                )
+                            }
+                        ]
+                    }]
+                }
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    resp = await client.post(gemini_url, json=payload)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates and "content" in candidates[0]:
+                            parts = candidates[0]["content"].get("parts", [])
+                            if parts and "text" in parts[0]:
+                                text_result = parts[0]["text"].strip()
+                                if text_result:
+                                    logger.info(f"Successfully transcribed audio via Gemini ({len(text_result)} chars)")
+                                    return {
+                                        "status": "success",
+                                        "text": text_result,
+                                        "provider": "google-gemini",
+                                    }
+            except Exception as e:
+                logger.warning(f"Google Gemini voice transcription attempt failed: {e}")
+
+        # 2. Try OpenAI Whisper (if OPENAI_API_KEY is configured)
+        if settings.OPENAI_API_KEY:
+            try:
+                whisper_url = "https://api.openai.com/v1/audio/transcriptions"
+                headers = {"Authorization": f"Bearer {settings.OPENAI_API_KEY}"}
+                files = {"file": (target_file.filename or "audio.webm", audio_bytes, mime)}
+                data = {"model": "whisper-1"}
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    resp = await client.post(whisper_url, headers=headers, files=files, data=data)
+                    if resp.status_code == 200:
+                        text_result = resp.json().get("text", "").strip()
+                        if text_result:
+                            logger.info(f"Successfully transcribed audio via OpenAI Whisper ({len(text_result)} chars)")
+                            return {
+                                "status": "success",
+                                "text": text_result,
+                                "provider": "openai-whisper",
+                            }
+            except Exception as e:
+                logger.warning(f"OpenAI Whisper transcription attempt failed: {e}")
+
+        # 3. Try OpenRouter Audio Transcriptions
+        if settings.OPENROUTER_API_KEY:
+            try:
+                openrouter_url = "https://openrouter.ai/api/v1/audio/transcriptions"
+                headers = {"Authorization": f"Bearer {settings.OPENROUTER_API_KEY}"}
+                files = {"file": (target_file.filename or "audio.webm", audio_bytes, mime)}
+                data = {"model": "openai/whisper-large-v3"}
+                async with httpx.AsyncClient(timeout=35.0) as client:
+                    resp = await client.post(openrouter_url, headers=headers, files=files, data=data)
+                    if resp.status_code == 200:
+                        text_result = resp.json().get("text", "").strip()
+                        if text_result:
+                            logger.info(f"Successfully transcribed audio via OpenRouter Whisper ({len(text_result)} chars)")
+                            return {
+                                "status": "success",
+                                "text": text_result,
+                                "provider": "openrouter-whisper",
+                            }
+            except Exception as e:
+                logger.warning(f"OpenRouter audio transcription attempt failed: {e}")
+
+        return {
+            "status": "unsupported",
+            "text": "",
+            "message": "Audio received. To enable AI speech transcription, set GEMINI_API_KEY (free Google Gemini key) or OPENAI_API_KEY in your .env file.",
+        }
+    except Exception as exc:
+        logger.error(f"Error processing voice transcription: {exc}", exc_info=True)
+        return {
+            "status": "error",
+            "text": "",
+            "message": f"Transcription error: {str(exc)}",
+        }
+
+
 # ─────────────────────────────────────────────────────────────
 # AUTH
 # ─────────────────────────────────────────────────────────────
@@ -331,10 +569,11 @@ async def submit_complaint(
     4. Forwards to Multi-Agent Engine for deliberation.
     """
     desc_clean = (description or "").strip()
-    if len(desc_clean) < 10:
+    is_valid_text, reason = _is_meaningful_text(desc_clean)
+    if not is_valid_text:
         raise HTTPException(
             status_code=422,
-            detail="Submission failed: Please provide a meaningful description of the issue (at least 10 characters)."
+            detail=f"Submission rejected: {reason}"
         )
 
     loc_clean = (location or "").strip()
@@ -356,8 +595,35 @@ async def submit_complaint(
     if cat_lower in ("sensitive", "safety", "harassment", "corruption", "confidential"):
         sensitive_flag = True
 
-    # Check if photographic evidence was uploaded
-    has_images = any(bool(upload.filename and upload.filename.strip()) for upload in images)
+    # ── Read & Validate Uploaded Images Upfront (EXIF Timestamp Verification) ──
+    validated_images = []
+    image_base64 = None
+    for idx, upload in enumerate(images):
+        if upload.filename and upload.filename.strip():
+            raw = await upload.read()
+            if raw:
+                capture_dt = _extract_exif_capture_time(raw)
+                if capture_dt:
+                    age_days = (datetime.utcnow() - capture_dt).total_seconds() / 86400.0
+                    if age_days > 15.0:
+                        raise HTTPException(
+                            status_code=422,
+                            detail=(
+                                f"Submission rejected: Photographic evidence is outdated (captured on "
+                                f"{capture_dt.strftime('%Y-%m-%d')}, {int(age_days)} days ago). "
+                                "Images must be taken within the last 15 days to reflect current civic conditions."
+                            ),
+                        )
+                validated_images.append({
+                    "data": raw,
+                    "mime_type": upload.content_type or "image/jpeg",
+                    "filename": upload.filename,
+                    "capture_dt": capture_dt,
+                })
+                if image_base64 is None:
+                    image_base64 = base64.b64encode(raw).decode("utf-8")
+
+    has_images = len(validated_images) > 0
 
     # Physical defects like Road Damage require visual proof
     desc_lower = desc_clean.lower()
@@ -420,26 +686,24 @@ async def submit_complaint(
     db.flush()  # get complaint.id before committing
 
     # ── Save uploaded images ────────────────────────────────────
-    image_base64 = None
-    for idx, upload in enumerate(images):
-        if upload.filename:
-            raw = await upload.read()
-            img_record = ComplaintImage(
-                complaint_id=ticket_id,
-                image_data=raw,
-                mime_type=upload.content_type or "image/jpeg",
-                original_filename=upload.filename,
-                image_type="evidence",
-            )
-            db.add(img_record)
-            if idx == 0:
-                image_base64 = base64.b64encode(raw).decode("utf-8")
+    for item in validated_images:
+        img_record = ComplaintImage(
+            complaint_id=ticket_id,
+            image_data=item["data"],
+            mime_type=item["mime_type"],
+            original_filename=item["filename"],
+            image_type="evidence",
+        )
+        db.add(img_record)
 
     db.commit()
 
     # ── Forward to Agent for AI processing ─────────────────────
     agent_payload = {
         "text": f"{'[CONFIDENTIAL/SENSITIVE] ' if sensitive_flag else ''}{valid_cat}: {description}. Location: {location}. {details}".strip(),
+        "category": valid_cat,
+        "raw_category": category,
+        "description": description,
         "image_base64": image_base64,
         "location": {"lat": lat, "lng": lng, "area": location} if lat else None,
         "citizen_id": str(current_user.id) if current_user else None,
@@ -454,14 +718,49 @@ async def submit_complaint(
             )
         if resp.status_code in (200, 201):
             agent_data = resp.json()
+            verification = agent_data.get("verification") or {}
+            rejection_reason = agent_data.get("rejection_reason")
+            is_rejected = (
+                agent_data.get("status") == "Rejected"
+                or not verification.get("approved", True)
+                or bool(rejection_reason)
+            )
+
+            if is_rejected:
+                complaint.status = "Rejected"
+                fail_msg = (
+                    rejection_reason
+                    or verification.get("reasoning")
+                    or "Photographic evidence contradicts the reported issue description and category."
+                )
+                tl = complaint.timeline or []
+                tl.append({
+                    "event": f"Submission rejected: {fail_msg}",
+                    "ts": datetime.utcnow().isoformat(),
+                    "actor": "CivicFlow Verification AI",
+                })
+                complaint.timeline = tl
+                complaint.last_updated = datetime.utcnow()
+                db.commit()
+
+                # Terminate submission immediately with 422 so citizen is notified of evidence mismatch
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Submission rejected: Photographic evidence does not corroborate your report. {fail_msg}"
+                )
+
             # Apply AI outputs back to the complaint
             complaint.priority = _map_severity(agent_data.get("severity", "Medium"))
             complaint.issue = agent_data.get("issue_type", f"{valid_cat} Issue")
 
-            # Map category accurately from agent output
-            agent_cat = _map_category(agent_data.get("issue_type", ""), description)
-            if agent_cat != "Other":
+            # Check if agent detected visual truth / category mismatch
+            agent_cat = _map_category(agent_data.get("category") or agent_data.get("issue_type", ""), description)
+            category_rectified = bool(agent_data.get("category_rectified"))
+
+            if agent_cat != "Other" and agent_cat != complaint.category:
+                orig_cat = complaint.category
                 complaint.category = agent_cat
+                category_rectified = True
 
             # Map department accurately from agent output + category fallback
             complaint.dept = _map_dept(agent_data.get("department", ""), complaint.category)
@@ -472,6 +771,8 @@ async def submit_complaint(
             complaint.ai_classification = {
                 "category": complaint.category,
                 "confidence": agent_data.get("issue_confidence", 0.85),
+                "rectified": category_rectified,
+                "original_category": valid_cat if category_rectified else None,
             }
             complaint.ai_severity = {
                 "priority": complaint.priority,
@@ -503,6 +804,12 @@ async def submit_complaint(
                 },
             }
             tl = complaint.timeline or []
+            if category_rectified and valid_cat != complaint.category:
+                tl.append({
+                    "event": f"Category rectified by Visual AI: Switched from {valid_cat} to {complaint.category} (matched image content)",
+                    "ts": datetime.utcnow().isoformat(),
+                    "actor": "CivicFlow Vision AI",
+                })
             tl.append({
                 "event": "AI classification completed",
                 "ts": datetime.utcnow().isoformat(),
@@ -513,6 +820,17 @@ async def submit_complaint(
             complaint.last_updated = datetime.utcnow()
 
             db.commit()
+        elif resp.status_code == 422:
+            agent_err = resp.json().get("detail", "Photographic evidence contradicts reported grievance.")
+            complaint.status = "Rejected"
+            db.commit()
+            raise HTTPException(
+                status_code=422,
+                detail=f"Submission rejected: {agent_err}"
+            )
+    except HTTPException:
+        # Crucial: Let intentional rejection HTTPExceptions bubble up to the client!
+        raise
     except Exception as exc:
         logger.warning(f"Agent unavailable, saving complaint without AI: {exc}")
 

@@ -68,4 +68,5 @@ temp/
 *.tfstate
 *.tfstate.*
 .terraform.lock.hcl
+terraform/terraform.tfvars
 agent/.env

@@ -22,14 +22,17 @@ class EvidenceAgent:
             issue_data = state.get("issue")
             claimed_issue = issue_data.get("issue_type") if issue_data else "Not yet classified or inferred from text"
 
+            selected_cat = complaint_input.get("category") or complaint_input.get("raw_category") or "Not specified"
+
             prompt_parts = []
             if feedback:
                 prompt_parts.append(
                     f"NOTE: Your previous attempt was rejected. Feedback: {feedback}. Please correct this in your new response.\n"
                 )
 
-            prompt_parts.append(f"Claimed Issue / Category: {claimed_issue}")
-            prompt_parts.append(f"Complaint Text: {text}")
+            prompt_parts.append(f"Citizen Selected Category: {selected_cat}")
+            prompt_parts.append(f"Intake Issue Type: {claimed_issue}")
+            prompt_parts.append(f"Citizen Complaint Text: {text}")
 
             is_sensitive = bool(complaint_input.get("is_sensitive", False))
             if not image_b64:
@@ -52,6 +55,40 @@ class EvidenceAgent:
                 image_b64=image_b64,
                 temperature=0.1,
             )
+
+            # Programmatic Domain Contradiction Guardrail
+            if image_b64 and not is_sensitive:
+                detected = (response.get("detected_issue") or response.get("visual_findings") or "").lower()
+                text_low = f"{text} {selected_cat} {claimed_issue}".lower()
+
+                domains = {
+                    "road": ["road", "pothole", "asphalt", "crater", "pavement", "broken road", "tar"],
+                    "water": ["water", "leak", "pipe", "pipeline", "drinking water", "tap leak", "burst pipe"],
+                    "waste": ["garbage", "trash", "waste", "dump", "debris", "litter", "rubbish"],
+                    "streetlight": ["streetlight", "street light", "lamp", "pole", "utility pole", "wiring", "light fixture", "electrical"],
+                    "drainage": ["drain", "sewage", "gutter", "overflow", "manhole", "sewer"],
+                }
+
+                claimed_domains = {d for d, kws in domains.items() if any(kw in text_low for kw in kws)}
+                photo_domains = {d for d, kws in domains.items() if any(kw in detected for kw in kws)}
+
+                if claimed_domains and photo_domains and not (claimed_domains & photo_domains):
+                    logger.warning(
+                        f"[EvidenceAgent Guardrail] Contradiction triggered: Claimed {claimed_domains} vs Photo {photo_domains}"
+                    )
+                    response["text_image_consistent"] = False
+                    response["cross_modal_contradiction"] = True
+                    response["category_mismatch"] = True
+                    response["grounding_score"] = 0.10
+                    contra_msg = (
+                        f"Cross-modal contradiction: Citizen reported '{', '.join(claimed_domains)}' issue, "
+                        f"but photo evidence depicts '{', '.join(photo_domains)}' ({detected})."
+                    )
+                    discs = response.get("discrepancies") or []
+                    if contra_msg not in discs:
+                        discs.append(contra_msg)
+                    response["discrepancies"] = discs
+                    response["reasoning"] = f"Fatal cross-modal contradiction: {contra_msg} Submission rejected."
 
             # If sensitive without image, ensure grounding score reflects textual validity rather than 0.4 penalty
             if is_sensitive and not image_b64:

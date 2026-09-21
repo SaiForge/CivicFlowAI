@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import re
+import time
 import asyncio
 from typing import Any, Dict, Optional
 import httpx
@@ -10,12 +11,20 @@ from app.config.settings import settings
 logger = logging.getLogger(__name__)
 
 _gemini_semaphore: Optional[asyncio.Semaphore] = None
+_openrouter_lock: Optional[asyncio.Lock] = None
+_openrouter_last_call_time: float = 0.0
 
 def _get_gemini_semaphore() -> asyncio.Semaphore:
     global _gemini_semaphore
     if _gemini_semaphore is None:
         _gemini_semaphore = asyncio.Semaphore(2)
     return _gemini_semaphore
+
+def _get_openrouter_lock() -> asyncio.Lock:
+    global _openrouter_lock
+    if _openrouter_lock is None:
+        _openrouter_lock = asyncio.Lock()
+    return _openrouter_lock
 
 def _sanitize_error(err: Exception) -> str:
     """Sanitize error messages, removing raw HTML or excessively long payloads."""
@@ -66,8 +75,8 @@ class LLMClient:
         )
         self.openrouter_model = (
             openrouter_model
-            or getattr(settings, "OPENROUTER_MODEL_NAME", "thinkingmachines/inkling-small:free")
-            or os.getenv("OPENROUTER_MODEL_NAME", "thinkingmachines/inkling-small:free")
+            or getattr(settings, "OPENROUTER_MODEL_NAME", "inclusionai/ling-3.0-flash-vl:free")
+            or os.getenv("OPENROUTER_MODEL_NAME", "inclusionai/ling-3.0-flash-vl:free")
         )
         self.openrouter_base_url = (
             openrouter_base_url
@@ -94,9 +103,9 @@ class LLMClient:
             else:
                 self.provider = "fallback"
 
-        # Initialize OpenAI Async client only if using OpenAI
+        # Initialize OpenAI Async client if key is available
         self._openai_client = None
-        if self.provider == "openai" and self.openai_api_key:
+        if self.openai_api_key:
             try:
                 from openai import AsyncOpenAI
                 self._openai_client = AsyncOpenAI(api_key=self.openai_api_key)
@@ -129,37 +138,71 @@ class LLMClient:
         temperature: float = 0.2,
     ) -> Dict[str, Any]:
         """
-        Complete a prompt asynchronously using the active provider (OpenRouter, Gemini, or OpenAI),
-        supporting vision input, structured JSON output, retry on parse error,
-        and exponential backoff.
+        Complete a prompt asynchronously using available providers (OpenRouter, Gemini, OpenAI)
+        with automatic failover if rate-limited or quota exhausted.
         """
+        # Determine candidate providers in order of preference
+        providers_to_try = []
         if self.provider == "openrouter":
-            return await self._complete_openrouter(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                image_b64=image_b64,
-                temperature=temperature,
-            )
-        elif self.provider == "gemini":
-            return await self._complete_gemini(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                image_b64=image_b64,
-                temperature=temperature,
-            )
-        elif self.provider == "openai":
-            return await self._complete_openai(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                image_b64=image_b64,
-                temperature=temperature,
-            )
+            # Strict provider adherence: if configured for openrouter, do not fall back to Gemini or other providers
+            providers_to_try = ["openrouter"]
+        elif self.provider in ["gemini", "openai"]:
+            providers_to_try.append(self.provider)
         else:
-            logger.warning("LLMClient has no active API keys configured. Generating fallback response.")
+            # Auto-detection priority
+            if self.openrouter_api_key:
+                providers_to_try.append("openrouter")
+            elif self.gemini_api_key:
+                providers_to_try.append("gemini")
+            elif self.openai_api_key:
+                providers_to_try.append("openai")
+
+        if not providers_to_try:
+            logger.warning("[LLMClient] No active API keys configured. Generating fallback response.")
             return {
                 "error": "No LLM API key (OPENROUTER_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY) configured",
                 "raw_text": "{}",
             }
+
+        last_err = None
+        for prov in providers_to_try:
+            try:
+                if prov == "openrouter":
+                    logger.info(f"[LLMClient] Dispatching API request to OpenRouter (model: {self.openrouter_model})...")
+                    res = await self._complete_openrouter(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        image_b64=image_b64,
+                        temperature=temperature,
+                    )
+                    logger.info(f"[LLMClient] OpenRouter successfully completed request.")
+                    return res
+                elif prov == "gemini":
+                    logger.info(f"[LLMClient] Dispatching API request to Google Gemini (model: {self.gemini_model})...")
+                    res = await self._complete_gemini(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        image_b64=image_b64,
+                        temperature=temperature,
+                    )
+                    logger.info(f"[LLMClient] Google Gemini successfully completed request.")
+                    return res
+                elif prov == "openai":
+                    logger.info(f"[LLMClient] Dispatching API request to OpenAI (model: {self.openai_model})...")
+                    res = await self._complete_openai(
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        image_b64=image_b64,
+                        temperature=temperature,
+                    )
+                    logger.info(f"[LLMClient] OpenAI successfully completed request.")
+                    return res
+            except Exception as exc:
+                last_err = exc
+                logger.warning(f"[LLMClient] Provider '{prov}' call failed: {exc}. Attempting next available provider...")
+
+        logger.error(f"[LLMClient] All candidate LLM providers failed. Last error: {last_err}")
+        raise last_err or RuntimeError("All LLM providers failed")
 
     async def _complete_openai(
         self,
@@ -247,6 +290,10 @@ class LLMClient:
 
         # Ensure valid model name
         model_name = self.gemini_model or "gemini-1.5-flash"
+        if "3.5" in model_name or not (model_name.startswith("gemini-") or model_name.startswith("models/")):
+            model_name = "gemini-1.5-flash"
+        if model_name.startswith("models/"):
+            model_name = model_name.replace("models/", "", 1)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={self.gemini_api_key}"
 
         parts: list[Dict[str, Any]] = [{"text": user_prompt}]
@@ -385,10 +432,9 @@ class LLMClient:
             messages.append({"role": "user", "content": user_prompt})
 
         payload = {
-            "model": self.openrouter_model or "thinkingmachines/inkling-small:free",
+            "model": self.openrouter_model or "inclusionai/ling-3.0-flash-vl:free",
             "messages": messages,
             "temperature": temperature,
-            "response_format": {"type": "json_object"},
         }
 
         headers = {
@@ -404,6 +450,18 @@ class LLMClient:
         async with httpx.AsyncClient(timeout=60.0) as client:
             for attempt in range(1, max_attempts + 1):
                 try:
+                    # Enforce strict 5.0s pacing between OpenRouter requests to prevent rate limits
+                    global _openrouter_last_call_time
+                    async with _get_openrouter_lock():
+                        now = time.time()
+                        elapsed = now - _openrouter_last_call_time
+                        min_interval = float(getattr(settings, "AGENT_DELAY_SECONDS", 5.0))
+                        if elapsed < min_interval:
+                            wait_time = min_interval - elapsed
+                            logger.info(f"[OpenRouter Rate-Limiting Guard] Enforcing {wait_time:.2f}s delay before dispatching request...")
+                            await asyncio.sleep(wait_time)
+                        _openrouter_last_call_time = time.time()
+
                     response = await client.post(
                         url,
                         json=payload,

@@ -1,0 +1,34 @@
+# ==============================================================================
+# CivicFlowAI — Terraform Variables Configuration Example
+# ==============================================================================
+# Copy this file to terraform.tfvars and customize with your credentials:
+#   cp terraform.tfvars.example terraform.tfvars
+# ==============================================================================
+
+# General
+resource_group_name = "rg-civicflow-prod"
+location            = "centralindia"            # e.g., centralindia, eastus, westeurope
+environment         = "prod"
+
+# Deployment Mode:
+#   "vm"   -> Native Ubuntu 22.04 VM with Nginx & Systemd (0 Containers, recommended)
+#   "paas" -> Azure Static Web Apps + Azure App Service
+deployment_mode = "vm"
+
+# Azure VM Parameters (used when deployment_mode = "vm")
+vm_name             = "civicflow-vm"
+vm_size             = "Standard_B2s"            # 2 vCPUs, 4GB RAM
+admin_username      = "azureuser"
+ssh_public_key_path = "~/.ssh/id_rsa.pub"       # Path to your local public SSH key
+dns_prefix          = "civicflow-ai-portal"     # Globally unique DNS label in region
+
+# Azure PaaS Settings (used when deployment_mode = "paas")
+app_service_plan_sku = "B1"
+
+# Managed PostgreSQL (Supabase Cloud)
+# Format: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require
+supabase_database_url = "postgresql://postgres:your-supabase-password@db.your-project-ref.supabase.co:5432/postgres?sslmode=require"
+
+# AI Model Deliberation Keys
+openrouter_api_key    = "sk-or-v1-xxxxxxxxxxxxxxxxxxxx"
+openrouter_model_name = "inclusionai/ling-3.0-flash-vl:free"

@@ -139,3 +139,17 @@ export const notificationsApi = {
   list: () => apiFetch('/api/notifications'),
   markRead: (id) => apiFetch(`/api/notifications/${id}/read`, { method: 'PATCH' }),
 };
+
+// ── Voice / Speech Services ───────────────────────────────────────────────────
+
+export const voiceApi = {
+  transcribe: async (audioBlob, language = 'en-IN') => {
+    const formData = new FormData();
+    formData.append('audio', audioBlob, 'recording.webm');
+    formData.append('language', language);
+    return apiFetch('/api/voice/transcribe', {
+      method: 'POST',
+      body: formData,
+    });
+  },
+};
