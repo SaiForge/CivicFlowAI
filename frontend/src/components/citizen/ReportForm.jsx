@@ -16,9 +16,14 @@ import {
   Mic,
   MicOff,
   Square,
-  Sparkles,
   Volume2,
   VolumeX,
+  Play,
+  Pause,
+  RotateCcw,
+  Trash2,
+  Radio,
+  FileAudio,
 } from 'lucide-react';
 
 const MAX_FILE_SIZE_MB = 20;
@@ -48,7 +53,7 @@ const QUICK_PRESETS = [
 ];
 
 const ReportForm = () => {
-  const { setReportFormOpen, setProcessingSubmission } = useApp();
+  const { reportFormOpen, setReportFormOpen, setProcessingSubmission } = useApp();
   const [form, setForm] = useState({
     category: '',
     description: '',
@@ -64,7 +69,7 @@ const ReportForm = () => {
   const [mapPickerOpen, setMapPickerOpen] = useState(false);
   const [locatingGps, setLocatingGps] = useState(false);
 
-  // ── Voice Dictation & Audio State ──
+  // ── Voice Dictation & Captured Audio State ──
   const [isListening, setIsListening] = useState(false);
   const [isListeningLoc, setIsListeningLoc] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -75,6 +80,13 @@ const ReportForm = () => {
   const [voiceLang, setVoiceLang] = useState('en-IN');
   const [interimText, setInterimText] = useState('');
   const [voiceDetectedCat, setVoiceDetectedCat] = useState(null);
+  const [capturedAudioBlob, setCapturedAudioBlob] = useState(null);
+  const [capturedAudioUrl, setCapturedAudioUrl] = useState(null);
+  const [capturedAudioDuration, setCapturedAudioDuration] = useState(0);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const [audioPlaybackTime, setAudioPlaybackTime] = useState(0);
+  const [audioVolume, setAudioVolume] = useState(0);
+
   const recognitionRef = useRef(null);
   const timerRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -83,6 +95,10 @@ const ReportForm = () => {
   const activeTargetFieldRef = useRef('description');
   const isListeningRef = useRef(false);
   const initialTextBeforeVoiceRef = useRef('');
+  const audioElementRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const analyserRef = useRef(null);
+  const animFrameRef = useRef(null);
 
   const fileRef = useRef();
 
@@ -202,6 +218,16 @@ const ReportForm = () => {
     }));
   };
 
+  // ── Auto-start Voice Capture if opened in Voice Mode ─────────────────────
+  useEffect(() => {
+    if (reportFormOpen === 'voice') {
+      const t = setTimeout(() => {
+        startVoiceRecognition('description');
+      }, 350);
+      return () => clearTimeout(t);
+    }
+  }, [reportFormOpen]);
+
   // ── Cleanup Speech & Audio on Unmount ─────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -217,11 +243,54 @@ const ReportForm = () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+      }
+      if (audioContextRef.current) {
+        try { audioContextRef.current.close(); } catch {}
+      }
+      if (capturedAudioUrl) {
+        URL.revokeObjectURL(capturedAudioUrl);
+      }
       if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
         try { window.speechSynthesis.cancel(); } catch {}
       }
     };
-  }, []);
+  }, [capturedAudioUrl]);
+
+  // ── Captured Voice Note Audio Handlers ────────────────────────────────────
+  const handleTogglePlayAudio = () => {
+    if (!audioElementRef.current) return;
+    if (isPlayingAudio) {
+      audioElementRef.current.pause();
+      setIsPlayingAudio(false);
+    } else {
+      audioElementRef.current.play()
+        .then(() => setIsPlayingAudio(true))
+        .catch((err) => console.warn('Audio play error:', err));
+    }
+  };
+
+  const handleDeleteAudio = () => {
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+    }
+    if (capturedAudioUrl) {
+      URL.revokeObjectURL(capturedAudioUrl);
+    }
+    setCapturedAudioBlob(null);
+    setCapturedAudioUrl(null);
+    setCapturedAudioDuration(0);
+    setIsPlayingAudio(false);
+    setAudioPlaybackTime(0);
+  };
+
+  const handleReRecordAudio = () => {
+    handleDeleteAudio();
+    setTimeout(() => {
+      startVoiceRecognition('description');
+    }, 150);
+  };
 
   // ── Text-to-Speech (Speaker Read Aloud) ────────────────────────────────────
   const handleSpeakText = (textToRead) => {
@@ -311,7 +380,7 @@ const ReportForm = () => {
     }
   };
 
-  // ── Dual Voice Engine: Live Dictation + Audio Recorder Fallback ───────────
+  // ── Dual Voice Engine: Live Dictation + Audio Recording & Persistence ───
   const startVoiceRecognition = async (targetField = 'description') => {
     setVoiceError(null);
     setVoiceDetectedCat(null);
@@ -331,12 +400,41 @@ const ReportForm = () => {
       try { recognitionRef.current.abort(); } catch {}
     }
 
-    // 1. Initialize Audio Recorder (captures raw microphone audio for Whisper AI backend)
+    // 1. Initialize Audio Recorder & Real-Time Audio Level Analyser
     audioChunksRef.current = [];
     if (typeof navigator !== 'undefined' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
+
+        // Set up Web Audio API Analyser for real-time waveform animation
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            const audioCtx = new AudioContextClass();
+            audioContextRef.current = audioCtx;
+            const analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            analyserRef.current = analyser;
+            const source = audioCtx.createMediaStreamSource(stream);
+            source.connect(analyser);
+
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            const updateMeter = () => {
+              if (!isListeningRef.current) return;
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+              const avg = sum / (dataArray.length || 1);
+              setAudioVolume(Math.min(100, Math.round((avg / 128) * 100)));
+              animFrameRef.current = requestAnimationFrame(updateMeter);
+            };
+            updateMeter();
+          }
+        } catch (meterErr) {
+          console.warn('AudioContext meter setup note:', meterErr);
+        }
+
         const recorder = new MediaRecorder(stream);
         recorder.ondataavailable = (e) => {
           if (e.data && e.data.size > 0) {
@@ -348,7 +446,7 @@ const ReportForm = () => {
       } catch (micErr) {
         console.warn('Microphone stream access error:', micErr);
         if (micErr.name === 'NotAllowedError' || micErr.name === 'PermissionDeniedError') {
-          setVoiceError('Microphone access was denied. Please allow microphone permissions in your browser.');
+          setVoiceError('Microphone access was denied. Please allow microphone permissions in your browser to capture voice.');
           isListeningRef.current = false;
           return;
         }
@@ -376,7 +474,7 @@ const ReportForm = () => {
 
     try {
       const recognition = new SpeechRecognition();
-      recognition.continuous = false; // Single utterance mode prevents Chrome websocket resets
+      recognition.continuous = true; // Continuous listening avoids abrupt cuts
       recognition.interimResults = true;
       recognition.lang = voiceLang || 'en-IN';
 
@@ -404,15 +502,14 @@ const ReportForm = () => {
         if (event.error === 'not-allowed') {
           setVoiceError('Microphone permission denied in browser.');
         } else if (event.error === 'network') {
-          // Google Web Speech API server unreachable — raw MediaRecorder audio will be transcribed via backend Whisper AI on stop!
           console.info('WebSpeech network note; audio recorder captures raw stream for AI transcription.');
         } else if (event.error === 'no-speech') {
-          // Normal pause in speech, ignore
+          // Normal silence, keep recording
         }
       };
 
       recognition.onend = () => {
-        // If user is still recording, auto-restart speech recognition loop seamlessly
+        // If user is still actively recording, restart continuous listener gracefully
         if (isListeningRef.current && recognitionRef.current === recognition) {
           try {
             recognition.start();
@@ -430,6 +527,7 @@ const ReportForm = () => {
   const stopVoiceRecognition = () => {
     const targetField = activeTargetFieldRef.current || 'description';
     isListeningRef.current = false;
+    const recordedDuration = voiceTimer;
 
     if (recognitionRef.current) {
       try {
@@ -440,13 +538,18 @@ const ReportForm = () => {
     setIsListening(false);
     setIsListeningLoc(false);
     setInterimText('');
+    setAudioVolume(0);
+
+    if (animFrameRef.current) {
+      cancelAnimationFrame(animFrameRef.current);
+    }
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
 
-    // Process recorded audio through AI Backend Transcription (Whisper AI)
+    // Process recorded audio through AI Backend Transcription & Save Voice Note
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       const recorder = mediaRecorderRef.current;
       recorder.onstop = async () => {
@@ -457,15 +560,20 @@ const ReportForm = () => {
         }
 
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-        // Send to backend if audio has content
+        // Save captured voice note for preview, playback and form submission
         if (audioBlob && audioBlob.size > 200) {
+          const audioUrl = URL.createObjectURL(audioBlob);
+          setCapturedAudioBlob(audioBlob);
+          setCapturedAudioUrl(audioUrl);
+          setCapturedAudioDuration(recordedDuration || 1);
+
           try {
             setIsTranscribing(true);
             const res = await voiceApi.transcribe(audioBlob, voiceLang);
             if (res && res.text && res.text.trim()) {
               applyTranscribedText(res.text.trim(), targetField);
               const preview = res.text.trim().slice(0, 30);
-              setTranscriptionSuccess(`✓ Transcribed: "${preview}${res.text.trim().length > 30 ? '…' : ''}"`);
+              setTranscriptionSuccess(`✓ Voice Transcribed: "${preview}${res.text.trim().length > 30 ? '…' : ''}"`);
               setVoiceError(null);
               setTimeout(() => setTranscriptionSuccess(null), 5000);
             }
@@ -536,6 +644,9 @@ const ReportForm = () => {
       if (form.lat) fd.append('lat', form.lat);
       if (form.lng) fd.append('lng', form.lng);
       files.forEach((f) => fd.append('images', f));
+      if (capturedAudioBlob) {
+        fd.append('audio', capturedAudioBlob, 'citizen_voice.webm');
+      }
 
       // Initiate submission promise
       const submitPromise = complaintsApi.submit(fd);
@@ -553,6 +664,7 @@ const ReportForm = () => {
         lng: form.lng,
         imagesCount: files.length,
         isSensitive: isSensitive,
+        hasVoiceNote: Boolean(capturedAudioBlob),
       });
 
     } catch (err) {
@@ -694,11 +806,11 @@ const ReportForm = () => {
               <div className="report-voice-panel">
                 <div className="voice-panel-left">
                   <div className="voice-waveform">
-                    <span className="voice-bar bar-1" />
-                    <span className="voice-bar bar-2" />
-                    <span className="voice-bar bar-3" />
-                    <span className="voice-bar bar-4" />
-                    <span className="voice-bar bar-5" />
+                    <span className="voice-bar bar-1" style={{ height: `${Math.max(10, Math.min(32, 10 + audioVolume * 0.28))}px` }} />
+                    <span className="voice-bar bar-2" style={{ height: `${Math.max(14, Math.min(36, 14 + audioVolume * 0.38))}px` }} />
+                    <span className="voice-bar bar-3" style={{ height: `${Math.max(18, Math.min(38, 18 + audioVolume * 0.42))}px` }} />
+                    <span className="voice-bar bar-4" style={{ height: `${Math.max(12, Math.min(34, 12 + audioVolume * 0.32))}px` }} />
+                    <span className="voice-bar bar-5" style={{ height: `${Math.max(10, Math.min(30, 10 + audioVolume * 0.25))}px` }} />
                   </div>
                   <span className="voice-status-text">
                     {interimText ? `“${interimText}”` : "Listening… Speak your civic problem clearly"}
@@ -723,6 +835,78 @@ const ReportForm = () => {
                   >
                     Done
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Captured Voice Grievance Audio Player */}
+            {capturedAudioUrl && !isListening && (
+              <div className="captured-voice-card">
+                <audio
+                  ref={audioElementRef}
+                  src={capturedAudioUrl}
+                  onEnded={() => setIsPlayingAudio(false)}
+                  onTimeUpdate={(e) => setAudioPlaybackTime(e.target.currentTime)}
+                  preload="auto"
+                  style={{ display: 'none' }}
+                />
+                <div className="voice-card-top">
+                  <div className="voice-card-pill">
+                    <span className="voice-card-badge-dot" />
+                    <FileAudio size={13} color="#2563eb" />
+                    <span>Citizen Voice Note Attached</span>
+                  </div>
+                  <div className="voice-card-meta">
+                    {capturedAudioDuration ? `${Math.floor(capturedAudioDuration / 60)}:${String(capturedAudioDuration % 60).padStart(2, '0')}` : '0:15'} · {capturedAudioBlob ? (capturedAudioBlob.size / 1024).toFixed(0) : 0} KB
+                  </div>
+                </div>
+
+                <div className="voice-player-bar">
+                  <button
+                    type="button"
+                    className={`voice-play-circle-btn ${isPlayingAudio ? 'playing' : ''}`}
+                    onClick={handleTogglePlayAudio}
+                    title={isPlayingAudio ? 'Pause Voice Grievance' : 'Play Voice Grievance'}
+                  >
+                    {isPlayingAudio ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" style={{ marginLeft: 2 }} />}
+                  </button>
+
+                  <div className="voice-player-track">
+                    <div className="voice-track-waveform">
+                      {[25, 45, 80, 60, 35, 75, 95, 65, 40, 85, 55, 90, 35, 70, 88, 50, 30].map((h, i) => (
+                        <span
+                          key={i}
+                          className={`voice-track-bar ${isPlayingAudio ? 'bar-animating' : ''}`}
+                          style={{ height: `${h}%` }}
+                        />
+                      ))}
+                    </div>
+                    <div className="voice-track-time">
+                      <span>{Math.floor(audioPlaybackTime / 60)}:{String(Math.floor(audioPlaybackTime % 60)).padStart(2, '0')}</span>
+                      <span>/</span>
+                      <span>{Math.floor(capturedAudioDuration / 60)}:{String(capturedAudioDuration % 60).padStart(2, '0')}</span>
+                    </div>
+                  </div>
+
+                  <div className="voice-player-actions">
+                    <button
+                      type="button"
+                      className="voice-action-pill-btn"
+                      onClick={handleReRecordAudio}
+                      title="Re-record voice note"
+                    >
+                      <RotateCcw size={12} />
+                      <span>Re-record</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="voice-action-pill-btn text-danger"
+                      onClick={handleDeleteAudio}
+                      title="Delete voice note"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

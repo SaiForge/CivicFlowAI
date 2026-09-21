@@ -9,7 +9,7 @@ import { useComplaints, useAreaStats, useNotifications } from '../../hooks/useAp
 import { StatusBadge } from '../shared/StatusBadge';
 import {
   MapPin, CheckCircle2, Clock3, Users, Plus,
-  ShieldCheck, AlertCircle, Car, Trash2, Droplets, Lightbulb, Waves, ArrowRight, Loader2
+  ShieldCheck, AlertCircle, Car, Trash2, Droplets, Lightbulb, Waves, ArrowRight, Loader2, Mic
 } from 'lucide-react';
 
 const statusFlow = [
@@ -25,6 +25,7 @@ const SECTIONS = ['My Complaints', 'Nearby Ward Issues', 'Ward Civic Map', 'Muni
 const ComplaintProgress = ({ complaint }) => {
   const { openDetail } = useApp();
   const currentIdx = statusFlow.findIndex(s => s.key === complaint.status);
+  const hasVoice = complaint.hasVoiceNote || complaint.voiceNoteUrl || complaint.images?.some(i => i.image_type === 'voice_note' || i.mime_type?.startsWith('audio/'));
 
   return (
     <div
@@ -34,12 +35,18 @@ const ComplaintProgress = ({ complaint }) => {
       onKeyDown={e => e.key === 'Enter' && openDetail(complaint.id)}
     >
       <div className="complaint-card-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <span className="complaint-id">{complaint.id}</span>
           <span className="civic-ward-tag">Ward 14</span>
           {complaint.dept && (
             <span className="civic-dept-micro-pill">
               {complaint.dept === 'road' ? 'PWD Road' : complaint.dept === 'waste' ? 'Nagar Nigam Waste' : complaint.dept === 'water' ? 'Jal Board' : 'Municipal'}
+            </span>
+          )}
+          {hasVoice && (
+            <span className="civic-voice-micro-pill" title="Recorded Citizen Voice Note Attached">
+              <Mic size={11} />
+              <span>Voice Note</span>
             </span>
           )}
         </div>
@@ -163,10 +170,20 @@ const CitizenDashboard = () => {
               </div>
             </div>
           </div>
-          <button className="grievance-report-btn" onClick={() => setReportFormOpen(true)}>
-            <span>Report Issue Now</span>
-            <ArrowRight size={15} strokeWidth={2.5} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+            <button
+              className="grievance-voice-btn"
+              onClick={() => setReportFormOpen('voice')}
+              title="Speak or record your civic grievance directly"
+            >
+              <Mic size={15} strokeWidth={2.5} />
+              <span>Record Voice Grievance</span>
+            </button>
+            <button className="grievance-report-btn" onClick={() => setReportFormOpen(true)}>
+              <span>Report Issue Now</span>
+              <ArrowRight size={15} strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
 
         <div className="grievance-quick-chips">

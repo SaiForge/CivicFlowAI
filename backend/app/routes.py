@@ -186,6 +186,12 @@ def _complaint_to_dict(c: Complaint, db: Session) -> Dict[str, Any]:
         ).model_dump()
         for img in c.images
     ]
+    voice_note_url = None
+    for img in c.images:
+        if img.image_type == "voice_note" or (img.mime_type and img.mime_type.startswith("audio/")):
+            voice_note_url = f"/api/complaints/{img.complaint_id}/images/{img.id}"
+            break
+
     return {
         "id": c.id,
         "incidentId": c.incident_id,
@@ -208,6 +214,8 @@ def _complaint_to_dict(c: Complaint, db: Session) -> Dict[str, Any]:
         "hasEvidence": bool(c.images),
         "isSensitive": bool(getattr(c, "is_sensitive", False)),
         "images": images,
+        "voiceNoteUrl": voice_note_url,
+        "hasVoiceNote": bool(voice_note_url),
         "aiClassification": c.ai_classification,
         "aiSeverity": c.ai_severity,
         "agentSteps": c.agent_steps,
@@ -687,6 +695,7 @@ async def submit_complaint(
     lng:          Optional[float] = Form(None),
     is_sensitive: Optional[Any] = Form(False),
     images:       List[UploadFile] = File(default=[]),
+    audio:        Optional[UploadFile] = File(None),
     db:           Session = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user),
 ):
@@ -756,6 +765,19 @@ async def submit_complaint(
 
     has_images = len(validated_images) > 0
 
+    # ── Read & Validate Uploaded Voice Note / Audio ──
+    audio_bytes = None
+    audio_mime = "audio/webm"
+    audio_filename = "voice_grievance.webm"
+    audio_base64 = None
+    if audio and audio.filename and audio.filename.strip():
+        raw_audio = await audio.read()
+        if raw_audio and len(raw_audio) > 100:
+            audio_bytes = raw_audio
+            audio_mime = audio.content_type or "audio/webm"
+            audio_filename = audio.filename
+            audio_base64 = base64.b64encode(raw_audio).decode("utf-8")
+
     # Physical defects like Road Damage require visual proof
     desc_lower = desc_clean.lower()
     is_physical_defect = (
@@ -788,6 +810,7 @@ async def submit_complaint(
         "raw_category": category,
         "description": description,
         "image_base64": image_base64,
+        "audio_base64": audio_base64,
         "location": {"lat": lat, "lng": lng, "area": location} if lat else None,
         "citizen_id": str(current_user.id) if current_user else None,
         "is_sensitive": sensitive_flag,
@@ -955,6 +978,17 @@ async def submit_complaint(
             image_type="evidence",
         )
         db.add(img_record)
+
+    # Save uploaded citizen voice note
+    if audio_bytes:
+        audio_record = ComplaintImage(
+            complaint_id=ticket_id,
+            image_data=audio_bytes,
+            mime_type=audio_mime,
+            original_filename=audio_filename,
+            image_type="voice_note",
+        )
+        db.add(audio_record)
 
     db.commit()
 

@@ -4,7 +4,7 @@ import { useComplaint } from '../../hooks/useApi';
 import { complaintsApi } from '../../services/api';
 import { StatusBadge, PriorityBadge } from './StatusBadge';
 import AgentTrace from './AgentTrace';
-import { X, MapPin, ThumbsUp, ThumbsDown, Upload, Loader2 } from 'lucide-react';
+import { X, MapPin, ThumbsUp, ThumbsDown, Upload, Loader2, Mic, Play, Pause, FileAudio } from 'lucide-react';
 
 const DEPT_STATUSES = ['Submitted','Under Review','Assigned','In Progress','Resolution Submitted','Verification Pending','Resolved'];
 
@@ -16,6 +16,10 @@ const ComplaintDetail = () => {
   const [saving, setSaving] = useState(false);
   const [voteLoading, setVoteLoading] = useState(false);
   const [resolutionFiles, setResolutionFiles] = useState([]);
+  const [playingVoice, setPlayingVoice] = useState(false);
+  const [voiceProgress, setVoiceProgress] = useState(0);
+  const [voiceDuration, setVoiceDuration] = useState(0);
+  const detailAudioRef = React.useRef(null);
 
   if (!detailOpen) return null;
 
@@ -81,6 +85,22 @@ const ComplaintDetail = () => {
     finally { setSaving(false); }
   };
 
+  const handleToggleVoicePlayback = () => {
+    if (!detailAudioRef.current) return;
+    if (playingVoice) {
+      detailAudioRef.current.pause();
+      setPlayingVoice(false);
+    } else {
+      detailAudioRef.current.play()
+        .then(() => setPlayingVoice(true))
+        .catch(err => console.warn('Playback error:', err));
+    }
+  };
+
+  const voiceNoteItem = (c.images || []).find(img => img.image_type === 'voice_note' || img.mime_type?.startsWith('audio/'));
+  const voiceUrl = c.voiceNoteUrl || (voiceNoteItem ? `${import.meta.env.VITE_API_URL || ''}${voiceNoteItem.url}` : null);
+  const photoImages = (c.images || []).filter(img => img.image_type !== 'voice_note' && !img.mime_type?.startsWith('audio/'));
+
   return (
     <>
       <div className="detail-backdrop" onClick={closeDetail} />
@@ -124,12 +144,59 @@ const ComplaintDetail = () => {
             </div>
           </div>
 
-          {/* Evidence Images */}
-          {c.images && c.images.length > 0 && (
+          {/* Citizen Recorded Voice Grievance Card */}
+          {voiceUrl && (
             <div className="detail-section">
-              <div className="detail-section-title">Uploaded Evidence ({c.images.length})</div>
+              <div className="detail-section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Mic size={14} color="#b45309" />
+                <span>Recorded Voice Grievance</span>
+              </div>
+              <div className="detail-voice-card">
+                <audio
+                  ref={detailAudioRef}
+                  src={voiceUrl}
+                  onEnded={() => setPlayingVoice(false)}
+                  onTimeUpdate={(e) => setVoiceProgress(e.target.currentTime)}
+                  onLoadedMetadata={(e) => setVoiceDuration(e.target.duration)}
+                  preload="metadata"
+                  style={{ display: 'none' }}
+                />
+                <button
+                  type="button"
+                  className={`detail-voice-play-btn ${playingVoice ? 'playing' : ''}`}
+                  onClick={handleToggleVoicePlayback}
+                  title={playingVoice ? 'Pause Voice Note' : 'Listen to Voice Grievance'}
+                >
+                  {playingVoice ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" style={{ marginLeft: 2 }} />}
+                </button>
+                <div className="detail-voice-content">
+                  <div className="detail-voice-title">Citizen Spoken Explanation</div>
+                  <div className="detail-voice-track">
+                    <div className="voice-track-waveform detail-waveform-mini">
+                      {[30, 60, 90, 50, 20, 80, 100, 70, 40, 85, 60, 95, 40, 75, 55, 30].map((h, i) => (
+                        <span
+                          key={i}
+                          className={`voice-track-bar ${playingVoice ? 'bar-animating' : ''}`}
+                          style={{ height: `${h}%` }}
+                        />
+                      ))}
+                    </div>
+                    <span className="detail-voice-time">
+                      {Math.floor(voiceProgress / 60)}:{String(Math.floor(voiceProgress % 60)).padStart(2, '0')}
+                      {voiceDuration ? ` / ${Math.floor(voiceDuration / 60)}:${String(Math.floor(voiceDuration % 60)).padStart(2, '0')}` : ''}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Evidence Images */}
+          {photoImages.length > 0 && (
+            <div className="detail-section">
+              <div className="detail-section-title">Uploaded Evidence ({photoImages.length})</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                {c.images.map((img) => (
+                {photoImages.map((img) => (
                   <a key={img.id} href={`${import.meta.env.VITE_API_URL || ''}${img.url}`} target="_blank" rel="noopener noreferrer">
                     {img.mime_type?.startsWith('image/') ? (
                       <img
@@ -139,7 +206,7 @@ const ComplaintDetail = () => {
                       />
                     ) : (
                       <div style={{ width: 80, height: 80, background: 'var(--dark-card)', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', padding: '0.25rem' }}>
-                        {img.original_filename || 'video'}
+                        {img.original_filename || 'media'}
                       </div>
                     )}
                   </a>
